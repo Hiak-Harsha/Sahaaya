@@ -40,6 +40,11 @@ object OfflineSyncQueue {
         return enqueue("ADVISORY_DELIVERY", memberId, payload)
     }
 
+    fun record48hRevisitScheduled(memberId: String, memberName: String, notes: String = ""): SyncEvent {
+        val payload = """{"member_id":"$memberId","name":"$memberName","action":"SCHEDULE_48H_REVISIT","notes":"$notes"}"""
+        return enqueue("SCHEDULE_48H_REVISIT", memberId, payload)
+    }
+
     fun enqueue(eventType: String, entityId: String, payloadJson: String): SyncEvent {
         val event = SyncEvent(
             eventType = eventType,

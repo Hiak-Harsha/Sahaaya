@@ -116,5 +116,60 @@ object FollowUpScheduler {
             citedProtocol = if (isUncontrolled) "NCD-1.4" else "NCD-3.1"
         )
     }
+    fun schedule48hRevisit(
+        beneficiaryName: String,
+        householdId: String,
+        today: LocalDate = LocalDate.now()
+    ): FollowUpScheduleItem {
+        val revisitDate = today.plusDays(2)
+        return FollowUpScheduleItem(
+            beneficiaryName = beneficiaryName,
+            householdId = householdId,
+            visitType = "Priority 48-Hour Clinical Re-Visit",
+            scheduledDate = revisitDate,
+            windowStart = today,
+            windowEnd = revisitDate,
+            clinicalPurpose = "Priority clinical reassessment within 48 hours for danger signs or follow-up surveillance.",
+            citedProtocol = "HBNC-1.1 / CHD-1.3"
+        )
+    }
 }
 
+object RevisitManager {
+    private const val PREFS_NAME = "sahaaya_48h_revisits"
+    private const val KEY_REVISIT_IDS = "scheduled_48h_ids"
+    private val inMemorySet = mutableSetOf<String>()
+
+    fun getScheduledIds(context: android.content.Context? = null): Set<String> {
+        if (context == null) return inMemorySet.toSet()
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val stored = prefs.getStringSet(KEY_REVISIT_IDS, emptySet())?.toSet() ?: emptySet()
+        inMemorySet.clear()
+        inMemorySet.addAll(stored)
+        return stored
+    }
+
+    fun setScheduled(context: android.content.Context?, memberId: String, isScheduled: Boolean) {
+        if (isScheduled) inMemorySet.add(memberId) else inMemorySet.remove(memberId)
+        if (context != null) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            val current = prefs.getStringSet(KEY_REVISIT_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+            if (isScheduled) current.add(memberId) else current.remove(memberId)
+            prefs.edit().putStringSet(KEY_REVISIT_IDS, current).apply()
+        }
+    }
+
+    fun toggleScheduled(context: android.content.Context?, memberId: String): Boolean {
+        val current = getScheduledIds(context)
+        val isNow = !current.contains(memberId)
+        setScheduled(context, memberId, isNow)
+        return isNow
+    }
+
+    fun clear(context: android.content.Context? = null) {
+        inMemorySet.clear()
+        if (context != null) {
+            context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE).edit().clear().apply()
+        }
+    }
+}

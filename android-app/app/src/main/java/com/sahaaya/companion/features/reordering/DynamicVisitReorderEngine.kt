@@ -53,5 +53,18 @@ object DynamicVisitReorderEngine {
 
         return mutableList
     }
+
+    /**
+     * Pins 48h-scheduled members to the absolute top of the route
+     * (above DANGER-group rank ties, below nothing).
+     */
+    fun apply48hPriorityOverrides(
+        visits: List<PrioritizedVisit>,
+        scheduled48hMemberIds: Set<String>
+    ): List<PrioritizedVisit> {
+        if (scheduled48hMemberIds.isEmpty()) return visits
+        val (pinned, normal) = visits.partition { scheduled48hMemberIds.contains(it.member.memberId) }
+        return pinned + normal
+    }
 }
 

@@ -30,6 +30,10 @@ import com.sahaaya.companion.features.reordering.DynamicVisitReorderEngine
 import com.sahaaya.companion.features.sync.OfflineSyncQueue
 import com.sahaaya.companion.ui.i18n.AppLanguage
 import com.sahaaya.companion.ui.i18n.Strings
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import com.sahaaya.companion.features.scheduling.FollowUpScheduler
+import com.sahaaya.companion.features.scheduling.RevisitManager
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,9 +47,15 @@ fun VisitsScreen(
     onOpenProfile: (RegisterMember) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var scheduled48hIds by remember { mutableStateOf(RevisitManager.getScheduledIds(context)) }
+
     val today = remember { VisitListEngine.EVALUATION_DATE }
-    val prioritizedVisits = remember(members) {
+    val basePrioritizedVisits = remember(members) {
         visitEngine.prioritizeVisits(members, today)
+    }
+    val prioritizedVisits = remember(basePrioritizedVisits, scheduled48hIds) {
+        DynamicVisitReorderEngine.apply48hPriorityOverrides(basePrioritizedVisits, scheduled48hIds)
     }
 
     var selectedFilter by remember { mutableStateOf("ALL") }
@@ -303,10 +313,12 @@ fun VisitsScreen(
             ) {
                 items(filteredList, key = { it.member.memberId }) { visit ->
                     val isDone = completedVisits.contains(visit.member.memberId)
+                    val is48h = scheduled48hIds.contains(visit.member.memberId)
                     BeneficiaryVisitCard(
                         visit = visit,
                         language = language,
                         isDone = isDone,
+                        is48hScheduled = is48h,
                         isDarkTheme = isDarkTheme,
                         onToggleDone = {
                             if (isDone) {
@@ -314,6 +326,14 @@ fun VisitsScreen(
                             } else {
                                 completedVisits.add(visit.member.memberId)
                                 OfflineSyncQueue.recordVisitCompletion(visit.member.memberId, visit.member.name, visit.reason)
+                            }
+                        },
+                        onToggle48h = {
+                            val isNowScheduled = RevisitManager.toggleScheduled(context, visit.member.memberId)
+                            scheduled48hIds = RevisitManager.getScheduledIds(context)
+                            if (isNowScheduled) {
+                                FollowUpScheduler.schedule48hRevisit(visit.member.name, visit.member.familyId)
+                                OfflineSyncQueue.record48hRevisitScheduled(visit.member.memberId, visit.member.name)
                             }
                         },
                         onConsultProtocol = { query ->
@@ -441,8 +461,10 @@ fun BeneficiaryVisitCard(
     visit: PrioritizedVisit,
     language: AppLanguage,
     isDone: Boolean,
+    is48hScheduled: Boolean = false,
     isDarkTheme: Boolean,
     onToggleDone: () -> Unit,
+    onToggle48h: () -> Unit = {},
     onConsultProtocol: (String) -> Unit,
     onOpenReferral: (PrioritizedVisit) -> Unit = {},
     onOpenProfile: (RegisterMember) -> Unit = {}
@@ -595,6 +617,35 @@ fun BeneficiaryVisitCard(
                 }
             }
 
+            // 48h RE-VISIT BADGE (Priority 1)
+            if (is48hScheduled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isDarkTheme) Color(0xFF3B270A) else Color(0xFFFEF3C7))
+                        .border(1.dp, if (isDarkTheme) WarningAmberDark else Color(0xFFF59E0B), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.EventRepeat,
+                            contentDescription = null,
+                            tint = if (isDarkTheme) WarningAmberDark else Color(0xFFB45309),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = Strings.scheduled48hBadge(language),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) WarningAmberDark else Color(0xFF92400E)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
             // DANGER ALERT BANNER (If previous visit recorded a danger sign)
             if (hasDangerFlag) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -686,12 +737,15 @@ fun BeneficiaryVisitCard(
             // Bottom Action Buttons Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Button 1: Mark Visited (Interactive Checklist)
                 OutlinedButton(
                     onClick = onToggleDone,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 38.dp),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (isDone) {
                             if (isDarkTheme) SuccessGreenDarkBg else SuccessGreenLight
@@ -707,32 +761,76 @@ fun BeneficiaryVisitCard(
                     Icon(
                         if (isDone) Icons.Default.CheckCircle else Icons.Default.Check,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(13.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = if (isDone) Strings.btnDoneChecked(language) else Strings.btnMarkDone(language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        lineHeight = 12.sp
                     )
                 }
 
-                // Button 2: Protocol Check
+                // Button 2: 48h Dynamic Re-Visit Stamping
+                OutlinedButton(
+                    onClick = onToggle48h,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 38.dp),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (is48hScheduled) {
+                            if (isDarkTheme) Color(0xFF3B270A) else Color(0xFFFEF3C7)
+                        } else Color.Transparent,
+                        contentColor = if (is48hScheduled) {
+                            if (isDarkTheme) WarningAmberDark else Color(0xFFB45309)
+                        } else {
+                            if (isDarkTheme) TextPrimaryDark else Color.DarkGray
+                        }
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(
+                        if (is48hScheduled) Icons.Default.EventRepeat else Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = Strings.btnSchedule48h(language),
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        lineHeight = 12.sp
+                    )
+                }
+
+                // Button 3: Protocol Check
                 Button(
                     onClick = { onConsultProtocol(visit.reason) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 38.dp),
+                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 3.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
                         contentColor = if (isDarkTheme) Color(0xFF022C28) else Color.White
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Default.MedicalServices, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(Icons.Default.MedicalServices, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     Text(
                         text = Strings.btnViewProtocol(language),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        lineHeight = 12.sp
                     )
                 }
             }
