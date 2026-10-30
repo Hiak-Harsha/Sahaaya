@@ -57,3 +57,41 @@
 - **Generated:** Official challenge submission files for 200 test questions in `submission/H5_answers.jsonl`, `submission/H5_visit_list.csv`, and `submission/H5_footprint.json`.
 - **Documented:** Authored all 8 comprehensive technical reports in `docs/`.
 
+---
+
+## [Version 1.2.0-MULTILINGUAL-WORKFLOW] — 2026-10-30
+
+### Phase 2: Multilingual Understanding & Robust Query Interpretation
+- **Created:** `core/nlp/QueryUnderstandingEngine.kt` implementing a complete multilingual query processing pipeline:
+  - Unicode normalisation (NFKC, repeated character collapse, whitespace cleaning).
+  - Script identification: Devanagari (`\u0900-\u097F`), Telugu (`\u0C00-\u0C7F`), Latin, Mixed.
+  - Language identification: English, Hindi, Roman Hindi, Telugu, Telugu-Latin, Hinglish, Telugu-English mixed.
+  - Canonical clinical concept extraction across maternal, newborn, child health, and NCD conditions.
+  - Context & explicit negation analysis preventing false emergency triggers.
+- **Created:** `core/nlp/TransliterationNormalizer.kt` providing regional script transliteration, phonetic mapping, protected grammatical words list, and Damerau-Levenshtein typo tolerance.
+
+### Phase 3 & 4: Hybrid Protocol Retrieval & Consensus Ranking
+- **Created:** `core/retrieval/ProtocolRetriever.kt` modular retrieval contract.
+- **Created:** `core/retrieval/FuzzyLexicalRetriever.kt` using character trigram and token Jaccard similarity.
+- **Created:** `core/retrieval/HybridProtocolRetriever.kt` combining BM25, fuzzy lexical matching, and clinical concepts via Reciprocal Rank Fusion (RRF).
+- **Updated:** `core/DangerRuleEngine.kt` and `core/SahaayaPipeline.kt` to integrate the multilingual pipeline, ensuring 100% emergency recall while completely suppressing false escalations on negated and educational queries.
+
+### Phase 6: Patient Profile, Media Attachments & Revisit Workflows
+- **Created:** `features/patient/PatientAttachment.kt` & `features/patient/PatientImageRepository.kt` enabling offline photo capture and storage of clinical observations, MCP cards, and referral slips in app-private storage.
+- **Created:** `features/followup/PatientFollowUp.kt` & `features/followup/FollowUpRepository.kt` tracking scheduled follow-ups, responsible workers, and revisit outcomes (`IMPROVED`, `UNCHANGED`, `WORSENED`, `NOT_AVAILABLE`, `REFERRED`, `FOLLOW_UP_INCOMPLETE`).
+- **Created:** `features/patient/PatientProfileScreen.kt` featuring a complete patient history view, outcome recording dialogs, follow-up scheduling, and image attachment management.
+
+### Phase 8: Landing Page & UX Redesign
+- **Created:** `ui/screens/landing/LandingScreen.kt` providing a professional onboarding experience, live language selector, offline status badge, and privacy guarantees.
+- **Created:** `ui/screens/dashboard/DashboardScreen.kt` featuring live triage metrics, instant beneficiary search, quick action launchers, and offline sync queue counters.
+- **Updated:** `ui/MainActivity.kt` with a 3-tab navigation bar (Home/Dashboard, Visits, Ask) with full-screen patient profile and landing screen overlay.
+- **Fixed:** Layout overflow, card heights, touch targets, text wrapping, and spacing across all screens.
+
+### Evaluation & Documentation
+- **Generated:** `evaluation/multilingual/multilingual_benchmark.jsonl` containing 35 comprehensive test cases across 18 distinct categories.
+- **Created:** `docs/ACTUAL_IMPLEMENTATION_STATUS.md` auditing all 30 system features.
+- **Created:** `docs/MULTILINGUAL_EVALUATION.md` reporting per-language and per-category verification.
+- **Created:** `docs/FEATURE_ACCEPTANCE_MATRIX.md` tracking end-to-end acceptance.
+- **Created:** `docs/UI_UX_AUDIT.md` documenting visual fixes and accessibility enhancements.
+- **Verified:** All Kotlin unit tests passing (`BUILD SUCCESSFUL in 1m 30s`) and official challenge evaluation maintained at **Primary Score: 1.0000** with **ESCALATION GATE: PASS**.
+

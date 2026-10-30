@@ -21,8 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sahaaya.companion.R
 import com.sahaaya.companion.core.*
+import com.sahaaya.companion.core.retrieval.FuzzyLexicalRetriever
+import com.sahaaya.companion.core.retrieval.HybridProtocolRetriever
+import com.sahaaya.companion.features.patient.PatientProfileScreen
 import com.sahaaya.companion.ui.i18n.AppLanguage
 import com.sahaaya.companion.ui.i18n.Strings
+import com.sahaaya.companion.ui.screens.dashboard.DashboardScreen
+import com.sahaaya.companion.ui.screens.landing.LandingScreen
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -57,7 +62,9 @@ class MainActivity : ComponentActivity() {
         val dangerEngine = DangerRuleEngine(rules)
         val intentGate = IntentGate()
         val bm25Retriever = Bm25Retriever(chunks)
-        pipeline = SahaayaPipeline(dangerEngine, intentGate, bm25Retriever)
+        val fuzzyRetriever = FuzzyLexicalRetriever(chunks)
+        val hybridRetriever = HybridProtocolRetriever(chunks, bm25Retriever, fuzzyRetriever)
+        pipeline = SahaayaPipeline(dangerEngine, intentGate, bm25Retriever, hybridRetriever)
         visitEngine = VisitListEngine()
 
         setContent {
@@ -86,9 +93,41 @@ class MainActivity : ComponentActivity() {
         var selectedTab by rememberSaveable { mutableStateOf(0) }
         var showBenchmarkDialog by remember { mutableStateOf(false) }
         var showLanguageMenu by remember { mutableStateOf(false) }
+        var isLandingVisible by rememberSaveable { mutableStateOf(false) }
         var askInitialQuery by remember { mutableStateOf<String?>(null) }
+        var selectedPatient by remember { mutableStateOf<RegisterMember?>(null) }
 
-        // Choose logo based on mode: Dark mode uses glowing squircle, Light mode uses bright symbol
+        val prioritizedVisits = remember(registerMembers) {
+            visitEngine.prioritizeVisits(registerMembers, VisitListEngine.EVALUATION_DATE)
+        }
+
+        // Full-screen Patient Profile workflow
+        if (selectedPatient != null) {
+            PatientProfileScreen(
+                member = selectedPatient!!,
+                isDarkTheme = isDarkTheme,
+                language = language,
+                onNavigateBack = { selectedPatient = null },
+                onNavigateToAsk = { query ->
+                    askInitialQuery = query
+                    selectedPatient = null
+                    selectedTab = 2 // Switch to Ask tab
+                }
+            )
+            return
+        }
+
+        // Landing / Onboarding overlay
+        if (isLandingVisible) {
+            LandingScreen(
+                isDarkTheme = isDarkTheme,
+                currentLanguage = language,
+                onLanguageChange = onLanguageChange,
+                onStartApplication = { isLandingVisible = false }
+            )
+            return
+        }
+
         val logoRes = if (isDarkTheme) {
             R.drawable.ic_sahaaya_logo
         } else {
@@ -183,7 +222,16 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // 2. Dark / Bright Theme Toggle
+                        // 2. Info / Landing Screen Button
+                        IconButton(onClick = { isLandingVisible = true }) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "About / Landing",
+                                tint = Color.White
+                            )
+                        }
+
+                        // 3. Dark / Bright Theme Toggle
                         IconButton(onClick = onToggleTheme) {
                             Icon(
                                 if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -192,7 +240,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 3. Benchmark Dialog
+                        // 4. Benchmark Dialog
                         IconButton(onClick = { showBenchmarkDialog = true }) {
                             Icon(
                                 Icons.Default.Speed,
@@ -210,8 +258,8 @@ class MainActivity : ComponentActivity() {
                     NavigationBarItem(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null) },
-                        label = { Text(Strings.tabAsk(language), fontWeight = FontWeight.SemiBold) },
+                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("Home", fontWeight = FontWeight.SemiBold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
                             selectedTextColor = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
@@ -229,27 +277,56 @@ class MainActivity : ComponentActivity() {
                             indicatorColor = if (isDarkTheme) SurfaceElevatedDark else Color(0xFFE0F2F1)
                         )
                     )
+                    NavigationBarItem(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        icon = { Icon(Icons.Default.QuestionAnswer, contentDescription = null) },
+                        label = { Text(Strings.tabAsk(language), fontWeight = FontWeight.SemiBold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                            selectedTextColor = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                            indicatorColor = if (isDarkTheme) SurfaceElevatedDark else Color(0xFFE0F2F1)
+                        )
+                    )
                 }
             }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {
-                if (selectedTab == 0) {
-                    AskScreen(
-                        pipeline = pipeline,
-                        language = language,
+                when (selectedTab) {
+                    0 -> DashboardScreen(
+                        members = registerMembers,
+                        prioritizedVisits = prioritizedVisits,
                         isDarkTheme = isDarkTheme,
-                        initialQuery = askInitialQuery
+                        language = language,
+                        onNavigateToVisits = { filter ->
+                            selectedTab = 1
+                        },
+                        onNavigateToAsk = { query ->
+                            askInitialQuery = query
+                            selectedTab = 2
+                        },
+                        onSelectPatient = { member ->
+                            selectedPatient = member
+                        }
                     )
-                } else {
-                    VisitsScreen(
+                    1 -> VisitsScreen(
                         members = registerMembers,
                         visitEngine = visitEngine,
                         language = language,
                         isDarkTheme = isDarkTheme,
                         onNavigateToAsk = { query ->
                             askInitialQuery = query
-                            selectedTab = 0
+                            selectedTab = 2
+                        },
+                        onOpenProfile = { member ->
+                            selectedPatient = member
                         }
+                    )
+                    2 -> AskScreen(
+                        pipeline = pipeline,
+                        language = language,
+                        isDarkTheme = isDarkTheme,
+                        initialQuery = askInitialQuery
                     )
                 }
 

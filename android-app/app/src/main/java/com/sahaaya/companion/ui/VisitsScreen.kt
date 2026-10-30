@@ -40,6 +40,7 @@ fun VisitsScreen(
     language: AppLanguage,
     isDarkTheme: Boolean,
     onNavigateToAsk: (String) -> Unit = {},
+    onOpenProfile: (RegisterMember) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val today = remember { VisitListEngine.EVALUATION_DATE }
@@ -320,7 +321,8 @@ fun VisitsScreen(
                         },
                         onOpenReferral = { dangerVisit ->
                             selectedDangerReferral = dangerVisit
-                        }
+                        },
+                        onOpenProfile = onOpenProfile
                     )
                 }
             }
@@ -442,7 +444,8 @@ fun BeneficiaryVisitCard(
     isDarkTheme: Boolean,
     onToggleDone: () -> Unit,
     onConsultProtocol: (String) -> Unit,
-    onOpenReferral: (PrioritizedVisit) -> Unit = {}
+    onOpenReferral: (PrioritizedVisit) -> Unit = {},
+    onOpenProfile: (RegisterMember) -> Unit = {}
 ) {
     val member = visit.member
     val isDanger = visit.priorityGroup == PriorityGroup.DANGER
@@ -565,15 +568,32 @@ fun BeneficiaryVisitCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Beneficiary Name
-            Text(
-                text = member.name,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDarkTheme) TextPrimaryDark else Color(0xFF0F172A),
-                    fontSize = 16.sp
+            // Beneficiary Name & Profile Click
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenProfile(member) },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) TextPrimaryDark else Color(0xFF0F172A),
+                        fontSize = 16.sp
+                    )
                 )
-            )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Profile", fontSize = 11.sp, color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal, fontWeight = FontWeight.SemiBold)
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Open Profile",
+                        tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
 
             // DANGER ALERT BANNER (If previous visit recorded a danger sign)
             if (hasDangerFlag) {

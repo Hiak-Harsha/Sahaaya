@@ -170,5 +170,42 @@ class SahaayaCoreTest {
         val pending = OfflineSyncQueue.getPendingEvents()
         assertTrue("Pending events should contain the event", pending.any { it.id == event.id })
     }
+
+    @Test
+    fun testMultilingualQueryUnderstandingAndTypoTolerance() {
+        // 1. Devanagari Hindi Script
+        val devanagariQuery = "बच्चे को तेज बुखार है और झटके आ रहे हैं"
+        val outDev = pipeline.process(devanagariQuery)
+        assertTrue("Devanagari query must escalate", outDev is PipelineOutput.DangerEscalation)
+
+        // 2. Telugu Script
+        val teluguQuery = "పిల్లాడికి తీవ్రమైన జ్వరం మరియు ఫిట్స్ వస్తున్నాయి"
+        val outTel = pipeline.process(teluguQuery)
+        assertTrue("Telugu query must escalate", outTel is PipelineOutput.DangerEscalation)
+
+        // 3. Typo Tolerance in Roman Hindi (e.g. 'palis dhns rhi' for pasli dhansna)
+        val typoQuery = "bacche ki palis andar dhns rhi he"
+        val outTypo = pipeline.process(typoQuery)
+        assertTrue("Typo query must escalate", outTypo is PipelineOutput.DangerEscalation)
+
+        // 4. Word-Order Variation
+        val wo1 = pipeline.process("bachcha doodh nahi pee raha")
+        val wo2 = pipeline.process("doodh nahi pee raha hai bachcha")
+        assertTrue("Standard word order must escalate", wo1 is PipelineOutput.DangerEscalation)
+        assertTrue("Inverted word order must escalate", wo2 is PipelineOutput.DangerEscalation)
+    }
+
+    @Test
+    fun testNegationAndSafetyFilters() {
+        // Negation: Symptoms denied by user must not escalate
+        val negated1 = pipeline.process("bachhe ko bukhar tha par ab jhatke nahi aa rahe hain")
+        // Should not escalate to emergency if convulsions are negated
+        assertFalse("Negated fits should not escalate", negated1 is PipelineOutput.DangerEscalation)
+
+        // Educational / Methodology questions should not falsely escalate
+        val eduQuery = "MUAC tape se green kab maana jaata hai?"
+        val outEdu = pipeline.process(eduQuery)
+        assertTrue("Educational query must return ProtocolAnswer", outEdu is PipelineOutput.ProtocolAnswer)
+    }
 }
 

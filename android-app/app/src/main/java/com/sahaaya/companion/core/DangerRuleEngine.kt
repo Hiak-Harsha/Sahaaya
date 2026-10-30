@@ -1,5 +1,8 @@
 package com.sahaaya.companion.core
 
+import com.sahaaya.companion.core.nlp.ProcessedQuery
+import com.sahaaya.companion.core.nlp.QueryUnderstandingEngine
+
 class DangerRuleEngine(private val rules: List<DangerRule>) {
 
     data class PhraseEntry(
@@ -38,14 +41,21 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
     }
 
     fun evaluate(query: String): DangerMatchResult {
-        val low = query.lowercase().trim()
-        val normQuery = normalize(query)
+        return evaluate(query, QueryUnderstandingEngine.process(query))
+    }
+
+    fun evaluate(query: String, processedQuery: ProcessedQuery): DangerMatchResult {
+        val rawLow = query.lowercase().trim()
+        val normLow = processedQuery.normalizedQuery.lowercase().trim()
+        val low = "$rawLow $normLow"
+        val normQuery = normalize("$query ${processedQuery.normalizedQuery}")
         if (normQuery.isBlank()) {
             return DangerMatchResult(matched = false)
         }
 
         // Method / Informational inquiry filters (do not escalate educational / method questions)
-        if (low.contains("kaise check karte") ||
+        if (processedQuery.isEducationalQuery ||
+            low.contains("kaise check karte") ||
             low.contains("kab maana jaata") ||
             low.contains("kitni ho to tez") ||
             low.contains("green kab")
@@ -57,6 +67,28 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         if (low.contains("1.9 kg")) return DangerMatchResult(matched = false)
         if (low.contains("kabhi kabhi ulti") && low.contains("doodh pee")) return DangerMatchResult(matched = false)
         if (low.contains("hb 8.6")) return DangerMatchResult(matched = false)
+
+        // Check if any extracted clinical concept is explicitly negated
+        val negatedConceptIds = processedQuery.extractedConcepts.filter { it.isNegated }.map { it.id }.toSet()
+
+        // Check active, non-negated clinical emergency concepts from QueryUnderstandingEngine
+        for (concept in processedQuery.extractedConcepts) {
+            if (!concept.isNegated && concept.primaryProtocolSection.startsWith("ESC")) {
+                val rule = findRuleForChunk(concept.primaryProtocolSection)
+                    ?: createSyntheticRule(
+                        concept.primaryProtocolSection,
+                        concept.canonicalName,
+                        "${concept.canonicalName}: refer immediately, call 108 (${concept.primaryProtocolSection})."
+                    )
+                return DangerMatchResult(
+                    matched = true,
+                    rule = rule,
+                    matchedPhrase = concept.matchedPhrase,
+                    citedSectionId = concept.primaryProtocolSection,
+                    authoritativeAnswer = "${concept.canonicalName}: refer immediately, call 108 (${concept.primaryProtocolSection})."
+                )
+            }
+        }
 
         // 1. Unconscious (ESC-6.3)
         if (low.contains("behosh") || low.contains("unconscious")) {
@@ -83,7 +115,8 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         }
 
         // 3. Convulsions / fits (ESC-5.1 or ESC-2.2)
-        if (low.contains("jhatke") || low.contains("convuls") || low.contains("fits") || low.contains("mirgi")) {
+        val hasConvulsionNegation = low.contains("jhatke nahi") || low.contains("no fits") || low.contains("no convulsion") || low.contains("fits nahi") || low.contains("fits levu") || negatedConceptIds.contains("CONVULSIONS")
+        if (!hasConvulsionNegation && (low.contains("jhatke") || low.contains("convuls") || low.contains("fits") || low.contains("mirgi"))) {
             val rule = findRuleForChunk("ESC-5.1") ?: createSyntheticRule("ESC-5.1", "Convulsions / Fits", "Convulsions during fever: critical danger sign, refer immediately, call 108 (ESC-5.1).")
             return DangerMatchResult(
                 matched = true,

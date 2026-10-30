@@ -1,14 +1,22 @@
 package com.sahaaya.companion.core
 
+import com.sahaaya.companion.core.nlp.ProcessedQuery
+import com.sahaaya.companion.core.nlp.QueryUnderstandingEngine
+import com.sahaaya.companion.core.retrieval.HybridProtocolRetriever
+
 class SahaayaPipeline(
     private val dangerRuleEngine: DangerRuleEngine,
     private val intentGate: IntentGate,
-    private val bm25Retriever: Bm25Retriever
+    private val bm25Retriever: Bm25Retriever,
+    private val hybridRetriever: HybridProtocolRetriever? = null
 ) {
 
     fun process(query: String): PipelineOutput {
-        // Step 1: Hard-coded danger-sign escalation layer (ALWAYS FIRES FIRST)
-        val dangerMatch = dangerRuleEngine.evaluate(query)
+        // Step 1: Multilingual Query Understanding & Normalization
+        val processedQuery = QueryUnderstandingEngine.process(query)
+
+        // Step 2: Hard-coded danger-sign escalation layer (ALWAYS FIRES FIRST)
+        val dangerMatch = dangerRuleEngine.evaluate(query, processedQuery)
         if (dangerMatch.matched && dangerMatch.rule != null) {
             val rule = dangerMatch.rule
             val citedId = dangerMatch.citedSectionId ?: rule.chunkId
@@ -25,7 +33,7 @@ class SahaayaPipeline(
             )
         }
 
-        // Step 2: Intent Gate (Refuses out-of-scope dosage, prescription, and diagnosis)
+        // Step 3: Intent Gate (Refuses out-of-scope dosage, prescription, and diagnosis)
         val gateResult = intentGate.evaluate(query)
         if (gateResult.isRefusal) {
             return PipelineOutput.ScopeRefusal(
@@ -36,8 +44,14 @@ class SahaayaPipeline(
             )
         }
 
-        // Step 3 & 4: BM25 Retrieval over grounded official protocol chunks
+        // Step 4: Grounded Retrieval
+        // 1. Try baseline BM25 on original query first (guarantees zero regression on baseline dev set)
+        // 2. Try hybrid retriever (combining clinical concepts, fuzzy lexical matching and BM25)
+        // 3. Fallback to BM25 on transliterated & normalized query for multilingual/typo queries
         val retrieval = bm25Retriever.search(query)
+            ?: hybridRetriever?.search(processedQuery)
+            ?: bm25Retriever.search(processedQuery.normalizedQuery)
+
         if (retrieval == null) {
             return PipelineOutput.OutOfCorpus(
                 message = "Not in my protocols, ask your ANM/doctor."
