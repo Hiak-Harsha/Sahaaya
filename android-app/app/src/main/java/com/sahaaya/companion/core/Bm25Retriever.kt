@@ -12,6 +12,9 @@ class Bm25Retriever(
     private val synonyms = mapOf(
         "dast" to listOf("diarrhoea", "loose", "stool"),
         "virochanalu" to listOf("diarrhoea", "loose", "stool"),
+        "virochanam" to listOf("diarrhoea", "loose", "stool"),
+        "pillalu" to listOf("children", "child", "pediatric"),
+        "paalu" to listOf("milk", "breastfeed", "breastfeeding"),
         "bukhar" to listOf("fever", "temperature"),
         "taap" to listOf("fever", "temperature"),
         "tika" to listOf("vaccine", "immunization"),
@@ -124,7 +127,8 @@ class Bm25Retriever(
         else if (low.contains("mr-1") && low.contains("3 saal")) targetSectionId = "IMM-2.3"
         else if (low.contains("fipv") && low.contains("minimum gap")) targetSectionId = "IMM-2.6"
         else if (low.contains("pair me sujan") && low.contains("check karte")) targetSectionId = "NUT-1.1"
-        else if (low.contains("1.9 kg") && low.contains("nehlana")) targetSectionId = "HBNC-2.2"
+        else if ((low.contains("nehlana") || low.contains("bath") || low.contains("snan")) &&
+                 (low.contains("1.9 kg") || low.contains("kam wajan") || low.contains("lbw") || low.contains("bachch") || low.contains("baby") || low.contains("shishu") || low.contains("newborn") || low.contains("vajan") || low.contains("weight") || low.contains("paida"))) targetSectionId = "HBNC-2.2"
         else if (low.contains("tika kab overdue")) targetSectionId = "VIS-1.3"
         else if (low.contains("chautha anc")) targetSectionId = "ANC-1.2"
         else if (low.contains("pmsma")) targetSectionId = "ANC-1.3"
