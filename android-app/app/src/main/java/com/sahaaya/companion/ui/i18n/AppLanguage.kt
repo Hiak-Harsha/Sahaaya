@@ -21,6 +21,12 @@ object Strings {
         AppLanguage.TELUGU -> "ఫ్రంట్‌లైన్ ఆరోగ్య సహచరి"
     }
 
+    fun tabHome(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Home"
+        AppLanguage.HINDI -> "होम"
+        AppLanguage.TELUGU -> "హోమ్"
+    }
+
     fun tabAsk(lang: AppLanguage): String = when (lang) {
         AppLanguage.ENGLISH -> "Ask Sahaaya"
         AppLanguage.HINDI -> "सहाय से पूछें"
@@ -393,5 +399,145 @@ object Strings {
         AppLanguage.HINDI -> "एएनएम / डॉक्टर को SMS भेजें"
         AppLanguage.TELUGU -> "ANM / డాక్టర్‌కు SMS పంపండి"
     }
-}
 
+    // Frontline Workflow Innovations & Parity Extensions
+    fun btnShareAdvisory(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Send Advisory (SMS)"
+        AppLanguage.HINDI -> "परामर्श भेजें (SMS)"
+        AppLanguage.TELUGU -> "సలహా పంపండి (SMS)"
+    }
+
+    fun btnSchedule48h(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "48h Re-Visit"
+        AppLanguage.HINDI -> "48 घंटे में पुनः भेंट"
+        AppLanguage.TELUGU -> "48 గంటల్లో పునఃసందర్శన"
+    }
+
+    fun scheduled48hBadge(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "PRIORITY 1: 48h RE-VISIT"
+        AppLanguage.HINDI -> "प्राथमिकता 1: 48 घंटे में पुनः भेंट"
+        AppLanguage.TELUGU -> "ప్రాధాన్యత 1: 48 గంటల్లో పునఃసందర్శన"
+    }
+
+    fun citationLabel(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Official MoHFW Protocol Citation"
+        AppLanguage.HINDI -> "आधिकारिक स्वास्थ्य मंत्रालय प्रोटोकॉल संदर्भ"
+        AppLanguage.TELUGU -> "అధికారిక MoHFW ప్రోటోకాల్ ఆధారం"
+    }
+
+    // Detailed Clinical Points Expansion
+    fun btnViewDetailedProtocol(count: Int, lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "View Detailed Protocol Points ($count) ▾"
+        AppLanguage.HINDI -> "विस्तृत क्लिनिकल बिंदु देखें ($count) ▾"
+        AppLanguage.TELUGU -> "వివరణాత్మక క్లినికల్ పాయింట్లు ($count) ▾"
+    }
+
+    fun btnHideDetailedProtocol(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Hide Detailed Protocol ▴"
+        AppLanguage.HINDI -> "विस्तृत विवरण छिपाएं ▴"
+        AppLanguage.TELUGU -> "వివరణను దాచు ▴"
+    }
+
+    fun detailedProtocolTitle(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Comprehensive Clinical Protocol Breakdown"
+        AppLanguage.HINDI -> "विस्तृत आधिकारिक क्लिनिकल प्रोटोकॉल"
+        AppLanguage.TELUGU -> "సమగ్ర అధికారిక క్లినికల్ ప్రోటోకాల్"
+    }
+
+    // Protocol Handbook & Guide Tab
+    fun tabGuide(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Protocols"
+        AppLanguage.HINDI -> "प्रोटोकॉल"
+        AppLanguage.TELUGU -> "ప్రోటోకాల్స్"
+    }
+
+    fun guideHeader(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Clinical Protocol Handbook"
+        AppLanguage.HINDI -> "क्लिनिकल प्रोटोकॉल हैंडबुक"
+        AppLanguage.TELUGU -> "క్లినికల్ ప్రోటోకాల్ హ్యాండ్‌బుక్"
+    }
+
+    fun guideSubheader(total: Int, lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "$total Official MoHFW and NHM Protocols Available Offline"
+        AppLanguage.HINDI -> "$total आधिकारिक स्वास्थ्य मंत्रालय प्रोटोकॉल ऑफ़लाइन उपलब्ध"
+        AppLanguage.TELUGU -> "$total అధికారిక MoHFW ప్రోటోకాల్స్ ఆఫ్‌లైన్‌లో ఉన్నాయి"
+    }
+
+    fun searchProtocolsPlaceholder(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Search protocols by topic, ID, or sign..."
+        AppLanguage.HINDI -> "विषय, आईडी या लक्षण से प्रोटोकॉल खोजें..."
+        AppLanguage.TELUGU -> "అంశం, ID లేదా లక్షణం ద్వారా శోధించండి..."
+    }
+
+    fun categoryAll(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "All"
+        AppLanguage.HINDI -> "सभी"
+        AppLanguage.TELUGU -> "అన్నీ"
+    }
+
+    fun categoryChild(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Child Health"
+        AppLanguage.HINDI -> "बाल स्वास्थ्य"
+        AppLanguage.TELUGU -> "శిశు ఆరోగ్యం"
+    }
+
+    fun categoryImm(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Immunization"
+        AppLanguage.HINDI -> "टीकाकरण"
+        AppLanguage.TELUGU -> "టీకాలు"
+    }
+
+    fun categoryMaternal(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Maternal Care"
+        AppLanguage.HINDI -> "मातृ देखभाल"
+        AppLanguage.TELUGU -> "మాతృ సంరక్షణ"
+    }
+
+    fun categoryEmergency(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Danger Signs"
+        AppLanguage.HINDI -> "खतरे के लक्षण"
+        AppLanguage.TELUGU -> "ప్రమాద సంకేతాలు"
+    }
+
+    fun categoryScope(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Scope Limits"
+        AppLanguage.HINDI -> "कार्य सीमाएं"
+        AppLanguage.TELUGU -> "పరిమితులు"
+    }
+
+    fun categoryNutrition(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Nutrition (SAM/MAM)"
+        AppLanguage.HINDI -> "पोषण (SAM/MAM)"
+        AppLanguage.TELUGU -> "పోషకాహారం"
+    }
+
+    fun categoryNcd(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "NCD / Diabetes / BP"
+        AppLanguage.HINDI -> "गैर-संचारी रोग"
+        AppLanguage.TELUGU -> "దీర్ఘకాలిక వ్యాధులు"
+    }
+
+    fun categoryVisits(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Visit Rules"
+        AppLanguage.HINDI -> "भेंट नियम"
+        AppLanguage.TELUGU -> "సందర్శన నియమాలు"
+    }
+
+    fun categoryOther(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Other"
+        AppLanguage.HINDI -> "अन्य"
+        AppLanguage.TELUGU -> "ఇతర"
+    }
+
+    fun btnAskAboutThis(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "Query Protocol"
+        AppLanguage.HINDI -> "प्रोटोकॉल खोजें"
+        AppLanguage.TELUGU -> "ప్రశ్నించండి"
+    }
+
+    fun noProtocolsMatch(lang: AppLanguage): String = when (lang) {
+        AppLanguage.ENGLISH -> "No protocols match your search query."
+        AppLanguage.HINDI -> "आपकी खोज से मेल खाता कोई प्रोटोकॉल नहीं मिला।"
+        AppLanguage.TELUGU -> "మీ శోధనకు సరిపోలే ప్రోటోకాల్స్ లేవు."
+    }
+}

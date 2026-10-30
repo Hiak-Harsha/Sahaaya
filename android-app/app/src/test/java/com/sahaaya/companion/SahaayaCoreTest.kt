@@ -207,5 +207,109 @@ class SahaayaCoreTest {
         val outEdu = pipeline.process(eduQuery)
         assertTrue("Educational query must return ProtocolAnswer", outEdu is PipelineOutput.ProtocolAnswer)
     }
-}
 
+    @Test
+    fun testNumericThresholds() {
+        // 1. Birth weight < 1.8 kg must escalate; >= 1.8 kg must not escalate
+        val lowBirthWeight = pipeline.process("navjaat shishu ka vajan 1.7 kg hai")
+        assertTrue("1.7 kg infant must escalate to ESC-4.4", lowBirthWeight is PipelineOutput.DangerEscalation)
+        assertEquals("ESC-4.4", (lowBirthWeight as PipelineOutput.DangerEscalation).citedSectionIds.first())
+
+        val normalBirthWeight = pipeline.process("navjaat shishu ka vajan 1.9 kg hai aur nehlana kab hai")
+        assertFalse("1.9 kg infant must not escalate as low birth weight", normalBirthWeight is PipelineOutput.DangerEscalation)
+
+        // 2. Prolonged fever >= 7 days must escalate; < 7 days must not escalate as prolonged fever
+        val fever6Days = pipeline.process("bacche ko 6 din se bukhar hai")
+        assertFalse("6 days fever should not trigger prolonged fever escalation", fever6Days is PipelineOutput.DangerEscalation)
+
+        val fever7Days = pipeline.process("bacche ko 7 din se bukhar hai")
+        assertTrue("7 days fever must escalate to ESC-5.4", fever7Days is PipelineOutput.DangerEscalation)
+        assertEquals("ESC-5.4", (fever7Days as PipelineOutput.DangerEscalation).citedSectionIds.first())
+
+        val fever9Days = pipeline.process("9 din se lagatar bukhar hai")
+        assertTrue("9 days fever must escalate to ESC-5.4", fever9Days is PipelineOutput.DangerEscalation)
+
+        // 3. Severe hypertensive crisis (>= 180/110)
+        val htnCrisis = pipeline.process("Patient ka blood pressure 190/115 aa raha hai")
+        assertTrue("BP 190/115 must escalate to ESC-6.4", htnCrisis is PipelineOutput.DangerEscalation)
+        assertEquals("ESC-6.4", (htnCrisis as PipelineOutput.DangerEscalation).citedSectionIds.first())
+    }
+
+    @Test
+    fun testIntentGateKitExceptions() {
+        // Kit exceptions that MUST NOT be refused:
+        val ifaQuery = pipeline.process("ifa ki lal goli kab khilana hai")
+        assertFalse("IFA query must not be refused", ifaQuery is PipelineOutput.ScopeRefusal)
+
+        val zincQuery = pipeline.process("dast me zinc tablet strip kaise dena hai")
+        assertFalse("Zinc query must not be refused", zincQuery is PipelineOutput.ScopeRefusal)
+
+        val orsQuery = pipeline.process("ors ka packet kitne paani me gholna chahiye")
+        assertFalse("ORS query must not be refused", orsQuery is PipelineOutput.ScopeRefusal)
+
+        val calciumQuery = pipeline.process("calcium goli khali pet khani hai kya")
+        assertFalse("Calcium query must not be refused", calciumQuery is PipelineOutput.ScopeRefusal)
+
+        val albendazoleQuery = pipeline.process("keede maarne ke liye albendazole kab de")
+        assertFalse("Albendazole query must not be refused", albendazoleQuery is PipelineOutput.ScopeRefusal)
+
+        val tepidQuery = pipeline.process("bukhar me tepid sponging kaise kare")
+        assertFalse("Tepid sponging query must not be refused", tepidQuery is PipelineOutput.ScopeRefusal)
+
+        // Out-of-scope queries with specific reasons:
+        val rxGate = IntentGate().evaluate("bache ko paracetamol syrup kitna ml dena")
+        assertTrue(rxGate.isRefusal)
+        assertEquals("PRESCRIPTION_OUT_OF_SCOPE", rxGate.reason)
+
+        val pcpndtGate = IntentGate().evaluate("ladka hoga ya ladki jaanch karani hai")
+        assertTrue(pcpndtGate.isRefusal)
+        assertEquals("PCPNDT_PROHIBITED", pcpndtGate.reason)
+
+        val adminGate = IntentGate().evaluate("u-win portal me login nahi ho raha hai")
+        assertTrue(adminGate.isRefusal)
+        assertEquals("ADMINISTRATIVE_OUT_OF_SCOPE", adminGate.reason)
+
+        val diagGate = IntentGate().evaluate("thyroid aur tsh ki test report dikhani hai")
+        assertTrue(diagGate.isRefusal)
+        assertEquals("DIAGNOSIS_OUT_OF_SCOPE", diagGate.reason)
+    }
+
+    @Test
+    fun testSafetyOrderPipeline() {
+        // Safety Order Invariant: Danger Detection MUST ALWAYS run before Intent Gate
+        // Even if a query requests a prescription dose, if danger signs are present, it must ESCALATE as Danger
+        val combinedQuery = "bache ko paracetamol dose kitna de jhatke aa rahe hain aur behosh hai"
+        val out = pipeline.process(combinedQuery)
+        assertTrue("Danger sign must fire before Intent Gate refusal", out is PipelineOutput.DangerEscalation)
+        assertFalse("Must not be intercepted by ScopeRefusal when danger sign is active", out is PipelineOutput.ScopeRefusal)
+    }
+
+    @Test
+    fun testRetrievalParity() {
+        // Parity test across key clinical protocols
+        val anc4 = pipeline.process("chautha anc checkup kab hota hai")
+        assertTrue(anc4 is PipelineOutput.ProtocolAnswer)
+        assertEquals("ANC-1.2", (anc4 as PipelineOutput.ProtocolAnswer).chunk.id)
+
+        val calcium = pipeline.process("calcium ki goli khali pet lena hai kya")
+        assertTrue(calcium is PipelineOutput.ProtocolAnswer)
+        assertEquals("ANC-2.3", (calcium as PipelineOutput.ProtocolAnswer).chunk.id)
+
+        val muac = pipeline.process("muac tape me green kab hota hai")
+        assertTrue(muac is PipelineOutput.ProtocolAnswer)
+        assertEquals("NUT-1.2", (muac as PipelineOutput.ProtocolAnswer).chunk.id)
+
+        val exercise = pipeline.process("sugar aur bp ke marij ko exercise kitni karni chahiye")
+        assertTrue(exercise is PipelineOutput.ProtocolAnswer)
+        assertEquals("NCD-3.1", (exercise as PipelineOutput.ProtocolAnswer).chunk.id)
+
+        val overdue = pipeline.process("tika kab overdue maana jaata hai")
+        assertTrue(overdue is PipelineOutput.ProtocolAnswer)
+        assertEquals("VIS-1.3", (overdue as PipelineOutput.ProtocolAnswer).chunk.id)
+
+        // Bounded LBW bathing: general 'bathroom' or 'bathe wound' should not match HBNC-2.2
+        val lbwBabyBath = pipeline.process("kam wajan ke bachche ko snan kab karaye")
+        assertTrue(lbwBabyBath is PipelineOutput.ProtocolAnswer)
+        assertEquals("HBNC-2.2", (lbwBabyBath as PipelineOutput.ProtocolAnswer).chunk.id)
+    }
+}

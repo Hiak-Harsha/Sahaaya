@@ -92,8 +92,8 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         // 1. Birth weight / Infant weight numeric parsing (< 1.8 kg is ESC-4.4)
         val kgMatcher = Pattern.compile("(\\d+(\\.\\d+)?)\\s*kg").matcher(low)
         val isInfantWeightContext = low.contains("bachcha") || low.contains("baby") || low.contains("paida") ||
-                low.contains("wajan") || low.contains("weight") || low.contains("janm") ||
-                low.contains("shishu") || low.contains("newborn") || low.contains("infant") || low.contains("biddha")
+                low.contains("wajan") || low.contains("vajan") || low.contains("weight") || low.contains("janm") ||
+                low.contains("navjaat") || low.contains("shishu") || low.contains("newborn") || low.contains("infant") || low.contains("biddha")
         if (kgMatcher.find()) {
             val weightVal = kgMatcher.group(1)?.toDoubleOrNull() ?: 2.5
             if (weightVal < 1.8 && isInfantWeightContext) {
@@ -119,7 +119,7 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         if (bpMatcher.find()) {
             val sys = bpMatcher.group(1)?.toIntOrNull() ?: 120
             val dia = bpMatcher.group(2)?.toIntOrNull() ?: 80
-            val isPregnancyContext = low.contains("pregnant") || low.contains("garbh") || low.contains("garbhavathi") || low.contains("delivery") || low.contains("prasav")
+            val isPregnancyContext = low.contains("pregnan") || low.contains("garbh") || low.contains("garbhavathi") || low.contains("delivery") || low.contains("prasav")
             if (sys >= 180 || dia >= 110) {
                 return createResult("ESC-6.4", "Hypertensive crisis (BP $sys/$dia >= 180/110)", "BP $sys/$dia", "CRITICAL: REFER IMMEDIATELY TO CHC/FRU (ESC-6.4)")
             }
@@ -151,7 +151,7 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
 
         // Bleeding in pregnancy / delivery (ESC-2.1)
         if ((low.contains("khoon") || low.contains("bleed") || low.contains("rakt") || low.contains("raktham")) &&
-            (low.contains("pregnant") || low.contains("garbh") || low.contains("delivery") ||
+            (low.contains("pregnan") || low.contains("garbh") || low.contains("delivery") ||
              low.contains("prasav") || low.contains("mahin") || low.contains("kadupu"))
         ) {
             return createResult("ESC-2.1", "Vaginal bleeding during pregnancy/delivery", "bleeding in pregnancy", "REFER NOW to FRU/Hospital (ESC-2.1)")
@@ -160,17 +160,16 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         // Fits / Convulsions in pregnancy (ESC-2.2)
         val hasConvulsionNegation = low.contains("jhatke nahi") || low.contains("no fits") || low.contains("no convulsion") || low.contains("fits nahi") || low.contains("fits levu") || negatedConceptIds.contains("CONVULSIONS")
         if (!hasConvulsionNegation &&
-            (low.contains("pregnant") || low.contains("garbh") || low.contains("delivery")) &&
+            (low.contains("pregnan") || low.contains("garbh") || low.contains("delivery")) &&
             (low.contains("jhatke") || low.contains("fits") || low.contains("daura") || low.contains("mirgi") || low.contains("behosh"))
         ) {
             return createResult("ESC-2.2", "Eclampsia / convulsions in pregnancy", "fits in pregnancy", "CRITICAL: REFER NOW to FRU (ESC-2.2)")
         }
 
         // Pre-eclampsia: severe headache, facial swelling, blurred vision (ESC-2.3)
-        if ((low.contains("pregnant") || low.contains("garbh") || low.contains("mahin")) &&
-            ((low.contains("chehra") && (low.contains("suja") || low.contains("sujan"))) ||
-             (low.contains("face") && low.contains("swell")) ||
-             ((low.contains("dhundhla") || low.contains("blur")) && (low.contains("sir dard") || low.contains("headache"))))
+        if (((low.contains("chehra") || low.contains("face") || low.contains("munh")) && (low.contains("suja") || low.contains("sujan") || low.contains("swell"))) ||
+            ((low.contains("pregnan") || low.contains("garbh") || low.contains("mahin")) &&
+             ((low.contains("dhundhla") || low.contains("blur")) && (low.contains("dard") || low.contains("sir") || low.contains("headache"))))
         ) {
             return createResult("ESC-2.3", "Pre-eclampsia (severe headache, facial swelling, blurred vision)", "pre-eclampsia symptoms", "REFER URGENTLY to CHC/FRU (ESC-2.3)")
         }
@@ -184,7 +183,7 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
 
         // Excessive vomiting in pregnancy (ESC-2.6)
         if ((low.contains("ulti") || low.contains("vomit")) &&
-            (low.contains("garbh") || low.contains("pregnant")) &&
+            (low.contains("garbh") || low.contains("pregnan")) &&
             (low.contains("paani") || low.contains("din bhar") || low.contains("everything") || low.contains("ruk nahi"))
         ) {
             return createResult("ESC-2.6", "Excessive vomiting in pregnancy", "excessive vomiting", "REFER IMMEDIATELY to hospital (ESC-2.6)")
@@ -326,15 +325,16 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
             chunkId = leafId,
             category = "EMERGENCY",
             dangerSign = dangerSign,
-            action = actionText,
+            action = "REFER NOW",
             sourceCitation = "MoHFW Protocol $leafId",
             note = "High-priority clinical emergency",
             phrasings = emptyMap()
         )
-        val answer = "$dangerSign: $actionText ($leafId)."
+        val finalRule = rule.copy(action = "REFER NOW")
+        val answer = "$dangerSign: REFER NOW, call 108 ($leafId)."
         return DangerMatchResult(
             matched = true,
-            rule = rule,
+            rule = finalRule,
             matchedPhrase = matchedPhrase,
             citedSectionId = leafId,
             authoritativeAnswer = answer
