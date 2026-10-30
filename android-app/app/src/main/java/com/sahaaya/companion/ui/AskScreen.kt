@@ -25,6 +25,12 @@ import androidx.compose.material.icons.filled.Warning
 import com.sahaaya.companion.features.advisory.PatientAdvisoryEngine
 import com.sahaaya.companion.features.emergency.EmergencySosEngine
 import com.sahaaya.companion.features.facilities.FacilityDirectory
+import com.sahaaya.companion.core.ClinicalTextFormatter
+import com.sahaaya.companion.ui.ShareUtils.shareViaSmsOrChooser
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -213,32 +219,96 @@ fun AskScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Quick Sample Chips
-        Text(
-            text = Strings.quickSamplesLabel(language),
-            style = MaterialTheme.typography.labelMedium.copy(
-                color = if (isDarkTheme) TextSecondaryDark else Color.DarkGray,
-                fontWeight = FontWeight.SemiBold
-            ),
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
+        // Quick Sample Queries Dropdown Selection Menu (F5)
+        var isSampleMenuExpanded by remember { mutableStateOf(false) }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            quickPrompts.forEach { prompt ->
-                SuggestionChip(
-                    onClick = {
-                        queryText = prompt
-                        currentOutput = pipeline.process(prompt)
-                    },
-                    label = { Text(prompt, fontSize = 11.sp, maxLines = 1) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = if (isDarkTheme) SurfaceElevatedDark else Color.White
-                    )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedCard(
+                onClick = { isSampleMenuExpanded = !isSampleMenuExpanded },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = if (isDarkTheme) SurfaceDark else Color.White
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isDarkTheme) Color(0xFF24364D) else Color(0xFFCBD5E1)
                 )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = Strings.quickSamplesLabel(language).removeSuffix(":"),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isDarkTheme) TextPrimaryDark else Color(0xFF334155),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Icon(
+                        if (isSampleMenuExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "Dropdown menu",
+                        tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded = isSampleMenuExpanded,
+                onDismissRequest = { isSampleMenuExpanded = false },
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .background(if (isDarkTheme) SurfaceElevatedDark else Color.White)
+            ) {
+                quickPrompts.forEach { prompt ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "•",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = prompt,
+                                    fontSize = 13.sp,
+                                    color = if (isDarkTheme) TextPrimaryDark else Color(0xFF0F172A),
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        },
+                        onClick = {
+                            queryText = prompt
+                            currentOutput = pipeline.process(prompt)
+                            isSampleMenuExpanded = false
+                        }
+                    )
+                }
             }
         }
 
@@ -543,13 +613,114 @@ fun AskScreen(
                                 color = if (isDarkTheme) TextPrimaryDark else Color(0xFF0F172A)
                             )
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = output.chunk.text,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    lineHeight = 20.sp,
-                                    color = if (isDarkTheme) TextPrimaryDark else Color(0xFF1E293B)
+                            if (!output.authoritativeAnswer.isNullOrBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isDarkTheme) Color(0xFF0D2824) else Color(0xFFE8F5E9))
+                                        .padding(10.dp)
+                                ) {
+                                    Text(
+                                        text = output.authoritativeAnswer,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            lineHeight = 20.sp,
+                                            color = if (isDarkTheme) Color(0xFF80CBC4) else Color(0xFF1B5E20)
+                                        )
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            } else {
+                                Text(
+                                    text = output.chunk.text,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        lineHeight = 20.sp,
+                                        color = if (isDarkTheme) TextPrimaryDark else Color(0xFF1E293B)
+                                    )
                                 )
-                            )
+                            }
+
+                            // F2: Collapsible Detailed Protocol Breakdown Expander
+                            val detailedPoints = remember(output.chunk.id) {
+                                ClinicalTextFormatter.formatToPoints(output.chunk.text, excludeText = output.authoritativeAnswer ?: "")
+                            }
+                            var isDetailedExpanded by remember(output.chunk.id) { mutableStateOf(false) }
+
+                            if (detailedPoints.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                TextButton(
+                                    onClick = { isDetailedExpanded = !isDetailedExpanded },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        if (isDetailedExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isDetailedExpanded) {
+                                            Strings.btnHideDetailedProtocol(language)
+                                        } else {
+                                            Strings.btnViewDetailedProtocol(detailedPoints.size, language)
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
+                                    )
+                                }
+
+                                if (isDetailedExpanded) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isDarkTheme) Color(0xFF132233) else Color(0xFFF8FAFC)
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isDarkTheme) Color(0xFF243B53) else Color(0xFFE2E8F0)
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(14.dp)) {
+                                            Text(
+                                                text = Strings.detailedProtocolTitle(language),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            detailedPoints.forEach { point ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 3.dp),
+                                                    verticalAlignment = Alignment.Top
+                                                ) {
+                                                    Text(
+                                                        text = "•",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp,
+                                                        color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                                                        modifier = Modifier.padding(end = 8.dp)
+                                                    )
+                                                    Text(
+                                                        text = point,
+                                                        fontSize = 12.sp,
+                                                        lineHeight = 17.sp,
+                                                        color = if (isDarkTheme) TextPrimaryDark else Color(0xFF1E293B)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(12.dp))
                             HorizontalDivider(color = if (isDarkTheme) Color(0xFF24364D) else Color.LightGray)
                             Spacer(modifier = Modifier.height(8.dp))
@@ -613,12 +784,7 @@ fun AskScreen(
                                 onClick = {
                                     val adv = PatientAdvisoryEngine.generateAdvisory(output.chunk.id, language)
                                     val text = PatientAdvisoryEngine.formatShareableText(adv)
-                                    val intent = PatientAdvisoryEngine.createShareIntent(text)
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "No sharing app available", Toast.LENGTH_SHORT).show()
-                                    }
+                                    context.shareViaSmsOrChooser(text, "Share Care Advisory via SMS")
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
