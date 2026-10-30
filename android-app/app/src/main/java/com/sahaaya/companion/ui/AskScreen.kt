@@ -129,6 +129,13 @@ fun AskScreen(
         }
     }
 
+    val executeSearch = { query: String ->
+        queryText = query
+        if (query.isNotBlank()) {
+            currentOutput = pipeline.process(query)
+        }
+    }
+
     val quickPrompts = Strings.quickPrompts(language)
 
     val logoRes = if (isDarkTheme) {
@@ -203,11 +210,7 @@ fun AskScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = {
-                    if (queryText.isNotBlank()) {
-                        currentOutput = pipeline.process(queryText)
-                    }
-                },
+                onClick = { executeSearch(queryText) },
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp),
@@ -329,8 +332,7 @@ fun AskScreen(
                             }
                         },
                         onClick = {
-                            queryText = prompt
-                            currentOutput = pipeline.process(prompt)
+                            executeSearch(prompt)
                             isSampleMenuExpanded = false
                         }
                     )
@@ -870,6 +872,127 @@ fun AskScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                            }
+                        }
+                    }
+                }
+
+                is PipelineOutput.ConversationalGuidance -> {
+                    // Conversational Guidance & Meaningful Sentence Prompt Card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                1.5.dp,
+                                if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                                RoundedCornerShape(16.dp)
+                            ),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDarkTheme) SurfaceDark else Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isDarkTheme) SurfaceElevatedDark else Color(0xFFE0F2F1)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Strings.conversationalGuidanceTitle(language),
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDarkTheme) TextPrimaryDark else SecondaryNavy
+                                        )
+                                    )
+                                    Text(
+                                        text = "Frontline Protocol Companion",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = Strings.conversationalGuidancePrompt(language),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = if (isDarkTheme) TextSecondaryDark else Color(0xFF334155),
+                                    lineHeight = 20.sp
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+                            HorizontalDivider(color = if (isDarkTheme) Color(0xFF24364D) else Color(0xFFE2E8F0))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = Strings.conversationalGuidanceHelpLabel(language),
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDarkTheme) TextPrimaryDark else SecondaryNavy
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val suggestions = Strings.conversationalGuidanceSuggestions(language)
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                suggestions.forEach { (label, fullQuery) ->
+                                    OutlinedButton(
+                                        onClick = {
+                                            executeSearch(fullQuery)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = if (isDarkTheme) SurfaceElevatedDark else Color(0xFFF8FAFC)
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isDarkTheme) Color(0xFF243B53) else Color(0xFFCBD5E1)
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.5.sp,
+                                                color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
+                                            )
+                                            Text(
+                                                text = "➔",
+                                                fontSize = 13.sp,
+                                                color = if (isDarkTheme) TextSecondaryDark else Color.Gray
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

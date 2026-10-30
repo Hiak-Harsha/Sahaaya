@@ -33,6 +33,11 @@ class SahaayaPipeline(
             )
         }
 
+        // Step 2b: Conversational Guidance Gate (greetings and pleasantries)
+        if (isConversational(query)) {
+            return PipelineOutput.ConversationalGuidance()
+        }
+
         // Step 3: Intent Gate (Refuses out-of-scope dosage, prescription, and diagnosis)
         val gateResult = intentGate.evaluate(query)
         if (gateResult.isRefusal) {
@@ -114,6 +119,61 @@ class SahaayaPipeline(
                 refused = true,
                 latency_ms = roundedLat
             )
+            is PipelineOutput.ConversationalGuidance -> SubmissionRow(
+                question_id = questionId,
+                answer_text = out.promptMessage.take(400),
+                cited_section_ids = emptyList(),
+                escalate = false,
+                refused = false,
+                latency_ms = roundedLat
+            )
         }
+    }
+
+    fun isConversational(query: String): Boolean {
+        val raw = query.trim()
+        if (raw.isEmpty()) return true
+
+        // Weakness fix (a): Do not strip Indian scripts into empty string.
+        // If raw query contains Devanagari or Telugu characters, it is a clinical/domain query, not conversational.
+        val hasIndicScript = raw.any { it in '\u0900'..'\u097F' || it in '\u0C00'..'\u0C7F' }
+        if (hasIndicScript) return false
+
+        val trimmed = raw.lowercase().replace(Regex("[^a-z0-9\\s]"), "")
+        val words = trimmed.split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (words.isEmpty()) return false
+
+        // Weakness fix (b): Clinical allowlist so short medical acronyms are not swallowed
+        val clinicalAllowlist = setOf(
+            "bp", "hb", "ors", "anc", "tt", "bcg", "opv", "mr", "ifa", "hbnc", "muac", "108", "102"
+        )
+        if (clinicalAllowlist.contains(trimmed) || words.any { clinicalAllowlist.contains(it) }) {
+            return false
+        }
+
+        val exactPhrases = setOf(
+            "hi", "hello", "hey", "hlo", "namaste", "namaskar", "namaskaram",
+            "vanakkam", "pranam", "pranaam", "good morning", "good afternoon",
+            "good evening", "shubh prabhat", "shubh sandhya", "kaise ho",
+            "how are you", "sahaaya", "sahaya", "kya haal hai", "help",
+            "madad", "sahayata", "test", "testing", "ok", "theek hai",
+            "thank you", "thanks", "dhanyawad", "dhanyavadalu", "shukriya",
+            "bye", "alvida", "good night", "hie", "helo", "hy", "hii", "hiii",
+            "asdf"
+        )
+        if (exactPhrases.contains(trimmed)) return true
+
+        val singleTokens = setOf(
+            "hi", "hello", "hey", "hlo", "namaste", "namaskar", "namaskaram",
+            "vanakkam", "pranam", "pranaam", "sahaaya", "sahaya", "hii", "hiii", "helo",
+            "asdf"
+        )
+        if (words.size == 1 && singleTokens.contains(words[0])) return true
+
+        if (trimmed.length < 3 && !trimmed.all { it.isDigit() } && !clinicalAllowlist.contains(trimmed)) {
+            return true
+        }
+
+        return false
     }
 }

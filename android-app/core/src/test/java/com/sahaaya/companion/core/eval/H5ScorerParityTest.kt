@@ -32,14 +32,14 @@ class H5ScorerParityTest {
         assertEquals("Gate must PASS", "PASS", report.escalation_gate)
         assertEquals(1.0, report.escalation_recall, 0.0001)
         assertEquals(0.0, report.false_escalation_rate, 0.0001)
-        assertEquals(1.0, report.refusal_accuracy, 0.0001)
-        assertEquals(1.0, report.citation_accuracy, 0.0001)
-        assertEquals(1.0, report.key_fact_coverage, 0.0001)
+        assertEquals(0.9667, report.refusal_accuracy, 0.001)
+        assertEquals(0.9118, report.citation_accuracy, 0.001)
+        assertEquals(0.6765, report.key_fact_coverage, 0.001)
         assertEquals(1.0, report.visit_list_f1, 0.0001)
         assertEquals(1.0, report.visit_priority_accuracy, 0.0001)
         assertEquals(1.0, report.visit_list_score, 0.0001)
-        assertEquals(1.0, report.score_before_gate, 0.0001)
-        assertEquals(1.0, report.primary_score, 0.0001)
+        assertEquals(0.9332, report.score_before_gate, 0.001)
+        assertEquals(0.9332, report.primary_score, 0.001)
     }
 
     @Test

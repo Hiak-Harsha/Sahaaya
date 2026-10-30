@@ -155,6 +155,48 @@ object Strings {
         AppLanguage.TELUGU -> "ప్రమాణిక ప్రోటోకాల్‌లలో సమాచారం కనుగొనబడలేదు. దయచేసి వైద్యాధికారిని సంప్రదించండి."
     }
 
+    fun conversationalGuidanceTitle(lang: AppLanguage): String = when (lang) {
+            AppLanguage.ENGLISH -> "Namaste! How can Sahaaya assist you?"
+            AppLanguage.HINDI -> "नमस्ते! सहाय आपकी क्या सहायता कर सकता है?"
+            AppLanguage.TELUGU -> "నమస్కారం! సహాయ మీకు ఎలా సహాయపడగలదు?"
+        }
+
+    fun conversationalGuidancePrompt(lang: AppLanguage): String = when (lang) {
+            AppLanguage.ENGLISH -> "Please enter a specific clinical symptom, patient sign, or health question to look up official MoHFW protocols."
+            AppLanguage.HINDI -> "स्वास्थ्य मंत्रालय के प्रोटोकॉल देखने के लिए कृपया कोई विशिष्ट लक्षण, स्वास्थ्य समस्या या प्रश्न लिखें।"
+            AppLanguage.TELUGU -> "MoHFW ప్రోటోకాల్స్ కోసం దయచేసి నిర్దిష్టమైన లక్షణం, ఆరోగ్య సమస్య లేదా ప్రశ్నను నమోదు చేయండి."
+        }
+
+    fun conversationalGuidanceHelpLabel(lang: AppLanguage): String = when (lang) {
+            AppLanguage.ENGLISH -> "Tap any topic below to search instantly:"
+            AppLanguage.HINDI -> "तुरंत खोजने के लिए नीचे दिए गए विषय पर टैप करें:"
+            AppLanguage.TELUGU -> "వెంటనే శోధించడానికి క్రింది అంశాన్ని తాకండి:"
+        }
+
+    fun conversationalGuidanceSuggestions(lang: AppLanguage): List<Pair<String, String>> = when (lang) {
+            AppLanguage.ENGLISH -> listOf(
+                "👶 Newborn Danger" to "Newborn breathing rate is 64 per minute and chest indrawing",
+                "💉 Immunization" to "What vaccines are given at 9 months",
+                "💧 Diarrhoea Hydration" to "How much ORS and Zinc for child diarrhoea",
+                "🤰 Antenatal ANC" to "What is the schedule for 4 ANC visits in pregnancy",
+                "🩺 High Blood Pressure" to "High BP 150/96 in pregnant woman danger signs"
+            )
+            AppLanguage.HINDI -> listOf(
+                "👶 नवजात खतरे के संकेत" to "नवजात की तेज सांस 64 प्रति मिनट और पसली धंसना",
+                "💉 टीकाकरण समय सारणी" to "9 महीने के बच्चे को कौन से टीके लगते हैं",
+                "💧 दस्त व निर्जलीकरण" to "दस्त में ओआरएस और जिंक की सही खुराक कितनी है",
+                "🤰 गर्भावस्था जांच (ANC)" to "गर्भावस्था में 4 एएनसी जांच कब-कब होती हैं",
+                "🩺 हाई ब्लड प्रेशर" to "गर्भवती महिला में 150/96 बीपी खतरे के संकेत"
+            )
+            AppLanguage.TELUGU -> listOf(
+                "👶 నవజాత ప్రమాద సంకేతాలు" to "నవజాత శిశువు శ్వాస వేగం 64 మరియు పక్కటెముకలు లోపలికి లాగడం",
+                "💉 టీకాల పట్టిక" to "9 నెలల పిల్లలకు వేసే టీకాలు ఏవి",
+                "💧 విరేచనాల సంరక్షణ" to "విరేచనాలలో ORS మరియు జింక్ మోతాదు ఎంత",
+                "🤰 గర్భధారణ తనిఖీ (ANC)" to "గర్భధారణ సమయంలో 4 ANC పరీక్షల షెడ్యూల్ ఏమిటి",
+                "🩺 అధిక రక్తపోటు (BP)" to "గర్భిణీలో BP 150/96 ఉన్నప్పుడు ప్రమాద సంకేతాలు"
+            )
+        }
+
     // Visits Screen
     fun visitsHeader(lang: AppLanguage): String = when (lang) {
         AppLanguage.ENGLISH -> "Today's Visit Schedule"

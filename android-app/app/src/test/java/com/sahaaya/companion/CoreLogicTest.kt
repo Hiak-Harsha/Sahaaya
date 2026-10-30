@@ -139,6 +139,27 @@ fun main() {
         "Failed ${outOfScopeQuestions.size - refusalPassed} questions"
     )
 
+
+    // -------------------------------------------------------------
+    // TEST 3C: Conversational Greetings & Guidance Prompt
+    // -------------------------------------------------------------
+    println("\n--- TEST 3C: Conversational Greetings & Guidance Prompt ---")
+    val conversationalQueries = listOf("hi", "hello", "hey", "namaste", "good morning", "asdf", "ok")
+    var convPassed = 0
+    for (cQ in conversationalQueries) {
+        val out = pipeline.process(cQ)
+        if (out is PipelineOutput.ConversationalGuidance) {
+            convPassed++
+        } else {
+            println("  FAILED to guide conversational input: '$cQ' -> got $out")
+        }
+    }
+    check(
+        "All conversational queries return ConversationalGuidance ($convPassed / ${conversationalQueries.size})",
+        convPassed == conversationalQueries.size,
+        "Failed ${conversationalQueries.size - convPassed} conversational queries"
+    )
+
     // -------------------------------------------------------------
     // TEST 4: Protocol retrieval for in-scope non-escalation questions
     // -------------------------------------------------------------

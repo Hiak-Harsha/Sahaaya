@@ -82,6 +82,11 @@ sealed class PipelineOutput {
         val message: String = "Not in my protocols, ask your ANM/doctor.",
         val citedSectionIds: List<String> = emptyList()
     ) : PipelineOutput()
+
+    data class ConversationalGuidance(
+        val greeting: String = "Namaste! I am Sahaaya, your frontline clinical companion.",
+        val promptMessage: String = "Please enter a specific clinical symptom, patient sign, or health question to look up official MoHFW protocols."
+    ) : PipelineOutput()
 }
 
 enum class PriorityGroup {

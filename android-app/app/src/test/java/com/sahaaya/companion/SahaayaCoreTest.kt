@@ -312,4 +312,60 @@ class SahaayaCoreTest {
         assertTrue(lbwBabyBath is PipelineOutput.ProtocolAnswer)
         assertEquals("HBNC-2.2", (lbwBabyBath as PipelineOutput.ProtocolAnswer).chunk.id)
     }
+
+    @Test
+    fun testConversationalGuidanceAndNegatives() {
+        // 1. Positive queries: 7 queries from zip 1
+        val conversationalQueries = listOf("hi", "hello", "hey", "namaste", "good morning", "asdf", "ok")
+        for (q in conversationalQueries) {
+            val out = pipeline.process(q)
+            assertTrue("Query '$q' must return ConversationalGuidance, got: $out", out is PipelineOutput.ConversationalGuidance)
+        }
+
+        // 2. Clinical shorthand / non-conversational queries must NOT be ConversationalGuidance
+        val clinicalNegatives = listOf(
+            "bp 150/96 pregnant",
+            "ors",
+            "bp",
+            "hb",
+            "tt",
+            "anc",
+            "muac"
+        )
+        for (q in clinicalNegatives) {
+            val out = pipeline.process(q)
+            assertFalse("Clinical query '$q' must NOT return ConversationalGuidance", out is PipelineOutput.ConversationalGuidance)
+        }
+
+        // 3. Devanagari and Telugu clinical queries must NOT be ConversationalGuidance
+        val indicQueries = listOf(
+            "नवजात शिशु सांस नहीं ले रहा और नीला पड़ रहा है",
+            "शिशु को दस्त और उल्टी है ओआरएस कैसे दें",
+            "శిశువు చల్లగా ఉంది పాలు తాగడం లేదు",
+            "గర్భిణీ స్త్రీలో అధిక రక్తపోటు సంకేతాలు"
+        )
+        for (q in indicQueries) {
+            val out = pipeline.process(q)
+            assertFalse("Indic clinical query '$q' must NOT return ConversationalGuidance", out is PipelineOutput.ConversationalGuidance)
+        }
+
+        // 4. Every danger query from existing danger tests must NOT be ConversationalGuidance and MUST be DangerEscalation
+        val dangerQueries = listOf(
+            "Bacche ko tez bukhar hai aur jhatke aa rahe hain",
+            "Pregnancy me chehra suja hua hai aur sar me tez dard hai",
+            "Bachha thanda lag raha hai aur doodh nahi pee raha",
+            "Sugar ka mareez behosh ho gaya hai",
+            "Delivery ke baad pad 5 minute me poora bheeg gaya",
+            "Navjaat shishu ka vajan 1.5 kg hai",
+            "9 din se lagatar bukhar hai",
+            "बच्चे को तेज बुखार है और झटके आ रहे हैं",
+            "పిల్లాడికి తీవ్రమైన జ్వరం మరియు ఫిట్స్ వస్తున్నాయి",
+            "bacche ki palis andar dhns rhi he"
+        )
+        for (q in dangerQueries) {
+            val out = pipeline.process(q)
+            assertFalse("Danger query '$q' must not return ConversationalGuidance", out is PipelineOutput.ConversationalGuidance)
+            assertTrue("Danger query '$q' must escalate to DangerEscalation", out is PipelineOutput.DangerEscalation)
+        }
+    }
 }
