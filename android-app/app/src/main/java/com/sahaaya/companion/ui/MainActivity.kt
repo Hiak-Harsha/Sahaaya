@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
         var selectedTab by rememberSaveable { mutableStateOf(0) }
         var showBenchmarkDialog by remember { mutableStateOf(false) }
         var showLanguageMenu by remember { mutableStateOf(false) }
-        var isLandingVisible by rememberSaveable { mutableStateOf(false) }
+        var isLandingVisible by rememberSaveable { mutableStateOf(true) }
         var askInitialQuery by remember { mutableStateOf<String?>(null) }
         var selectedPatient by remember { mutableStateOf<RegisterMember?>(null) }
 
