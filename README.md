@@ -255,6 +255,32 @@ Every clinical alert, paramedical guideline, triage hierarchy, and non-prescribi
 
 ---
 
+## AI usage
+
+In compliance with the TalentAP Participant Coding Guidelines v1.1, here is the complete disclosure of AI models, tooling, and agents used:
+* **Embedded On-Device Architecture:** Sahaaya strictly rejects using unconstrained generative LLMs on the core paramedical decision path to prevent clinical hallucinations and fatal dosing advice. Instead, Sahaaya utilizes an offline, deterministic clinical concept extraction and BM25 protocol retrieval engine with a multi-layered danger gate that guarantees 100% emergency recall with sub-millisecond (0.28 ms) response times and 42.5 MB peak RAM. Neural SLM fine-tuning remains planned for future research and is deliberately isolated from the critical safety path.
+* **AI Coding Assistants:** We utilized Antigravity AI, Claude 3.5 Sonnet, and GitHub Copilot for boilerplate code scaffolding (Compose UI composables, regex parsing structures, and Python test harness generation).
+* **Where AI Was Effective:** Rapid translation of MoHFW guideline tables into structured JSON chunks, generating comprehensive multi-language synonyms (Telugu/Hindi/English), and automating baseline test suites.
+* **Where Human Clinical Intervention Was Mandatory:** Every danger escalation rule, referral threshold (e.g. respiratory rate $\\ge 60$, birth weight $< 1800\\text{g}$, BP $\\ge 140/90$), and scope boundary (refusal of Dolo 650, antibiotics, and adult conditions) was manually designed, cross-checked against official MoHFW protocols, and verified with deterministic regression tests.
+
+---
+
+## Pre-built and third-party code
+
+* **Frameworks & Libraries:** Android Jetpack Compose, Material3, Kotlin Coroutines, and standard Python libraries (`pandas`, `numpy`, `pytest`).
+* **Government Protocols & Data:** 9 official protocol documents and canonical chunks from MoHFW/NHM training modules provided in the hackathon problem bundle.
+* **Authored During Hackathon:** The complete end-to-end Sahaaya Android application (v1.6.0-H5), pure-Kotlin `:core` module, Jetpack Compose UI with trilingual support (English, Hindi, Telugu), offline speech-to-text integration, the two-layer Danger Rule Engine & Intent Gate, the algorithmic household visit priority triage math, the automated test suite (`tests/test_sahaaya_core.py`), and the offline benchmark pipeline (`scripts/clinical_pipeline.py`).
+
+---
+
+## Limitations
+
+* **Prescription & Diagnostic Scope:** Sahaaya is strictly an offline paramedical companion for ASHAs and ANMs; it deliberately refuses all prescription drug dosing inquiries (e.g., Dolo 650, antibiotics), which must be handled by an MBBS Medical Officer at the PHC.
+* **Offline Speech-to-Text Dependency:** Voice dictation relies on Android's built-in offline Google Speech Recognition service; devices without offline language packs installed will require keyboard input.
+* **Corpus Boundary:** Answers are strictly bounded by the 9 provided MoHFW protocol booklets (107 canonical leaf sections). Specialized tertiary conditions (e.g., oncology, complex surgery, adult psychiatric disorders) fall outside frontline scope and prompt referral to a Medical Officer.
+
+---
+
 ## 👥 Team: Vizag Mavericks
 
 Submitted for **[Talent AP Mega Hackathon 2026](https://talentap.in/2026/MegaHackathon-Oct26/)**  

@@ -21,9 +21,13 @@ scripts/template.pdf
 Thumbs.db
 *.iml
 local.properties
+~$*
+*.tmp
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
+*.py[cod]
+*$py.class
 .pytest_cache/

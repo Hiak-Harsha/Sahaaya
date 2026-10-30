@@ -95,3 +95,30 @@
 - **Created:** `docs/UI_UX_AUDIT.md` documenting visual fixes and accessibility enhancements.
 - **Verified:** All Kotlin unit tests passing (`BUILD SUCCESSFUL in 1m 30s`) and official challenge evaluation maintained at **Primary Score: 1.0000** with **ESCALATION GATE: PASS**.
 
+
+
+---
+
+## [Version 1.6.0-H5] — 2026-10-31
+
+### Parity Port & Content Transfer from Reference Zip 1
+- **Transferred:** TECHNICAL_EXPLANATION_OF_EVERYTHING_USED.md to repository root and past-round/ folder.
+- **Transferred:** Complete guidlines-etc/ directory containing official H5 Problem Statement PDF, Participant Guidelines v1.1, presentation decks, baseline scripts, and evaluation assets.
+- **Transferred:** Standalone testing suites: 	ests/test_sahaaya_core.py, scripts/blind_adversarial_test.py, and scripts/stress_test_benchmark.py.
+- **Transferred:** submission_dev/H5_visit_list_detailed.csv (detailed Chandrapuri Block visit-list with reasoning annotations).
+- **Recorded:** Root score.json from earlier v1.5.0 run (official H5 score 0.931 vs v1.6.0-H5 score 0.9332).
+- **Implemented Workstream A (Conversational Guidance):**
+  - Added PipelineOutput.ConversationalGuidance data class to :core Model.kt.
+  - Implemented isConversational(query: String) in SahaayaPipeline.kt placed strictly between danger escalation and intent gate (safety invariant preserved).
+  - Fixed Zip 1 weaknesses: added Latin non-blank check so Indian scripts (Devanagari/Telugu) are never stripped or falsely flagged as greetings, and added clinical shorthand allowlist (p, hb, ors, nc, 	t, cg, opv, mr, ifa, hbnc, muac, 108, 102).
+  - Added trilingual string resources (conversationalGuidanceTitle, conversationalGuidancePrompt, conversationalGuidanceHelpLabel, conversationalGuidanceSuggestions) in English, Hindi, and Telugu.
+  - Added ConversationalGuidance card to AskScreen.kt using theme tokens with quick search dispatch.
+  - Added unit tests in SahaayaCoreTest.kt and CoreLogicTest.kt (TEST 3C).
+- **Implemented Workstream B (Python Parity):**
+  - Added CONVERSATIONAL_STOPWORDS and is_conversational_greeting() to scripts/clinical_pipeline.py with identical script protection and clinical allowlist.
+- **Implemented Workstream C (Benchmark Metrics Upgrade):**
+  - Added P95 latency, peak memory (PSS), APK size calculation, and per-category question pass breakdown dynamically to BenchmarkScreen.kt.
+  - Added default parameter pkFile: File? = null to maintain backward compatibility.
+- **Implemented Workstream F (Repo Union & Metadata):**
+  - Updated .gitignore union with ~$*, *.tmp, *.py[cod], *.class.
+  - Updated README.md with AI usage disclosure, pre-built/third-party code attribution, and clinical scope limitations.
