@@ -268,12 +268,9 @@ Generated offline via Sahaaya Companion
 
                     Button(
                         onClick = {
-                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                putExtra(Intent.EXTRA_TEXT, slipText)
-                                type = "text/plain"
+                            com.sahaaya.companion.ui.ShareUtils.run {
+                                context.shareViaSmsOrChooser(slipText, "Share Emergency Slip via SMS / 108")
                             }
-                            val shareIntent = Intent.createChooser(sendIntent, "Share Emergency Slip via SMS / 108")
-                            context.startActivity(shareIntent)
                         },
                         modifier = Modifier.weight(1.3f),
                         colors = ButtonDefaults.buttonColors(

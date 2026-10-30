@@ -317,12 +317,9 @@ Summary:
 
                     Button(
                         onClick = {
-                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                putExtra(Intent.EXTRA_TEXT, reportText)
-                                type = "text/plain"
+                            com.sahaaya.companion.ui.ShareUtils.run {
+                                context.shareViaSmsOrChooser(reportText, "Send Daily Report to ANM / Doctor")
                             }
-                            val shareIntent = Intent.createChooser(sendIntent, "Send Daily Report to ANM / Doctor")
-                            context.startActivity(shareIntent)
                         },
                         modifier = Modifier.weight(1.3f),
                         colors = ButtonDefaults.buttonColors(
