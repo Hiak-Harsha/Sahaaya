@@ -1,0 +1,9 @@
+{
+  "model_names": [
+    "none"
+  ],
+  "model_size_mb": 0.0,
+  "peak_ram_mb": null,
+  "median_latency_ms_cpu": 0.0,
+  "offline": true
+}

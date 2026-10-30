@@ -1,0 +1,41 @@
+{
+  "primary_score": 0.30684,
+  "escalation_gate": "FAIL",
+  "gate_recall_condition": "FAIL",
+  "gate_false_escalation_condition": "PASS",
+  "score_before_gate": 0.61368,
+  "escalation_recall": 0.6,
+  "false_escalation_rate": 0.033333,
+  "refusal_accuracy": 0.866667,
+  "citation_accuracy": 0.352941,
+  "key_fact_coverage": 0.411765,
+  "visit_list_score": 0.615385,
+  "visit_list_precision": 0.666667,
+  "visit_list_recall": 0.666667,
+  "visit_list_f1": 0.666667,
+  "visit_priority_accuracy": 0.538462,
+  "n_questions_scored": 40,
+  "n_must_escalate": 10,
+  "n_missing_answers": 0,
+  "missing_answer_ids_first10": [],
+  "missed_escalation_ids_first10": [
+    "Q-G20QVHL2",
+    "Q-UTQ3QUQ5",
+    "Q-W1FZK0UL",
+    "Q-YUXAY4F9"
+  ],
+  "n_missed_escalations": 4,
+  "n_visit_truth_rows": 39,
+  "n_visit_pred_rows_in_scope": 39,
+  "visit_list_file_present": true,
+  "median_latency_ms_reported": 0.2065,
+  "footprint_reported": {
+    "model_names": [
+      "bm25-keyword-baseline (no neural model)"
+    ],
+    "model_size_mb": 0.0,
+    "peak_ram_mb": null,
+    "median_latency_ms_cpu": 0.208,
+    "offline": true
+  }
+}

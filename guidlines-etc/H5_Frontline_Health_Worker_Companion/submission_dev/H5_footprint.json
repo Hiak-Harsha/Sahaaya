@@ -1,0 +1,11 @@
+{
+  "model_names": [
+    "Sahaaya-Deterministic-Clinical-Pipeline",
+    "Clinical-Concept-Classifier",
+    "BM25-Protocol-Retriever"
+  ],
+  "model_size_mb": 0.35,
+  "peak_ram_mb": 42.5,
+  "median_latency_ms_cpu": 0.077,
+  "offline": true
+}
