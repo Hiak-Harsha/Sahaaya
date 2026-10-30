@@ -91,8 +91,59 @@ def normalize_query(text: str) -> str:
     return t
 
 
+CONVERSATIONAL_STOPWORDS = {
+    "hi", "hello", "hey", "hlo", "namaste", "namaskar", "namaskaram",
+    "vanakkam", "pranam", "pranaam", "sahaaya", "sahaya", "hii", "hiii", "helo",
+    "asdf"
+}
+
+
+def is_conversational_greeting(query: str) -> bool:
+    raw = query.strip()
+    if not raw:
+        return True
+
+    # Weakness fix (a): Do not strip Indian scripts into empty string.
+    # If raw query contains Devanagari (\u0900-\u097F) or Telugu (\u0C00-\u0C7F), it is clinical text, not a greeting.
+    if any("\u0900" <= ch <= "\u097f" or "\u0c00" <= ch <= "\u0c7f" for ch in raw):
+        return False
+
+    trimmed = re.sub(r"[^a-z0-9\s]", "", raw.lower()).strip()
+    words = trimmed.split()
+    if not words:
+        return False
+
+    # Weakness fix (b): Clinical allowlist so clinical shorthand is never swallowed as greeting
+    clinical_allowlist = {
+        "bp", "hb", "ors", "anc", "tt", "bcg", "opv", "mr", "ifa", "hbnc", "muac", "108", "102"
+    }
+    if trimmed in clinical_allowlist or any(w in clinical_allowlist for w in words):
+        return False
+
+    exact_phrases = {
+        "hi", "hello", "hey", "hlo", "namaste", "namaskar", "namaskaram",
+        "vanakkam", "pranam", "pranaam", "good morning", "good afternoon",
+        "good evening", "shubh prabhat", "shubh sandhya", "kaise ho",
+        "how are you", "sahaaya", "sahaya", "kya haal hai", "help",
+        "madad", "sahayata", "test", "testing", "ok", "theek hai",
+        "thank you", "thanks", "dhanyawad", "dhanyavadalu", "shukriya",
+        "bye", "alvida", "good night", "hie", "helo", "hy", "hii", "hiii",
+        "asdf"
+    }
+    if trimmed in exact_phrases:
+        return True
+
+    if len(words) == 1 and words[0] in CONVERSATIONAL_STOPWORDS:
+        return True
+
+    if len(trimmed) < 3 and not trimmed.isdigit() and trimmed not in clinical_allowlist:
+        return True
+
+    return False
+
+
 def expand_tokens(norm_text: str) -> list[str]:
-    raw_tokens = norm_text.split()
+    raw_tokens = [tok for tok in norm_text.split() if tok not in CONVERSATIONAL_STOPWORDS]
     tokens = []
     for tok in raw_tokens:
         tokens.append(tok)
@@ -363,6 +414,8 @@ class BM25Retriever:
         self.b = 0.75
 
     def search(self, query: str) -> list[str]:
+        if is_conversational_greeting(query):
+            return []
         norm = normalize_query(query)
         q_tokens = expand_tokens(norm)
 
