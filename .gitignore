@@ -1,0 +1,23 @@
+# Build outputs
+*.apk
+android-app/build/
+android-app/app/build/
+android-app/.gradle/
+android-app/.kotlin/
+.gradle/
+.kotlin/
+build/
+*.class
+
+# Downloaded and temporary scratch files
+downloaded_protocols/
+tmp_slides/
+test-runner.jar
+scripts/template.pdf
+
+# OS and IDE files
+.idea/
+.DS_Store
+Thumbs.db
+*.iml
+local.properties
