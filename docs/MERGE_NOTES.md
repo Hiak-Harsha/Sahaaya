@@ -48,3 +48,20 @@ The merge preserves BASE's rich enterprise frontline health-worker architecture 
 2. **Ephemeral 48h Scheduling**: SOURCE stored 48h scheduled members in an in-memory Compose `mutableStateListOf`. BASE persists this state to `SharedPreferences` and registers it in `FollowUpScheduler` and `DynamicVisitReorderEngine`.
 3. **Hard-coded advisory text**: SOURCE used hard-coded strings for SMS sharing. BASE uses `PatientAdvisoryEngine` and `EmergencySosEngine` with citations.
 4. **Bathing regex over-match**: SOURCE matched "snan/bath/nehlana" without infant context, which could misclassify general hygiene questions. BASE enforces newborn/LBW context.
+
+
+---
+
+## 4. Verification & Release Summary
+
+All planned features F1 through F11 have been successfully implemented and verified:
+1. **F8 (IntentGate Parity)**: ASHA kit exceptions (IFA, zinc, ORS, calcium, albendazole, tepid sponging) + 4 categorized out-of-scope reasons (`PCPNDT_PROHIBITED`, `ADMINISTRATIVE_OUT_OF_SCOPE`, `DIAGNOSIS_OUT_OF_SCOPE`, `PRESCRIPTION_OUT_OF_SCOPE`). Committed in `7b5e793`.
+2. **F7 (DangerRuleEngine Devanagari & Numeric Parsing)**: Devanagari transliteration preprocessing, numeric parsing for infant weight (< 1.8 kg -> ESC-4.4; >= 1.8 kg -> no esc), fever duration (>= 7 days -> ESC-5.4; < 7 days -> no esc), severe BP parsing (crisis >= 180/110 -> ESC-6.4; pregnancy >= 140/90 -> ESC-2.3), and complete 18 ESC leaves. Committed in `b086751`.
+3. **F9 (Retrieval Parity & Concept Routing)**: Stem mapping, clinical routing for ANC, MUAC, NCD, IMM, LBW bathing. Bounded LBW bathing to newborn context. Committed in `5e89b05`.
+4. **F2 (ClinicalTextFormatter & Ask Expander)**: `core/ClinicalTextFormatter.kt` added and tested. Collapsible "View detailed protocol (N points)" expander integrated into `AskScreen.kt`. Committed in `d064f79`.
+5. **F4 (SMS-First Sharing)**: `ui/ShareUtils.kt` added (`Context.shareViaSmsOrChooser` with `smsto:` and fallback). Integrated across `AskScreen.kt`, `ReferralSlipDialog.kt`, and `DailySummaryDialog.kt`. `<queries>` added to `AndroidManifest.xml`. Committed in `899ef69`.
+6. **F5 (Compact Dropdown)**: Collapsible `DropdownMenu` with `quickPrompts` in `AskScreen.kt`. Committed in `47c7c6c`.
+7. **F1 (Protocol Guide Screen)**: Complete `ui/GuideScreen.kt` created with 107 leaf sections, search bar, category chips (CHD, IMM, MATERNAL, NUT, NCD, ESC, SCP, OTHER), points expander, and "Query Protocol" navigation to Ask. Committed in `47c7c6c`.
+8. **F6 (Top Bar & Nav Polish in MainActivity)**: 36dp logo, 38dp/20dp action buttons, `weight(1f, fill=false)` with ellipsis on titles to prevent overflow, and 4-tab bottom navigation (`Home`, `Visits`, `Ask`, `Guide`). Committed in `47c7c6c`.
+9. **F3 (48-Hour Re-Visit Scheduling)**: Persistent `RevisitManager` using `SharedPreferences`, `FollowUpScheduler.schedule48hRevisit`, `OfflineSyncQueue.record48hRevisitScheduled`, `DynamicVisitReorderEngine.apply48hPriorityOverrides`, and `RevisitSchedulingTest.kt`. Committed in `1d62297`.
+10. **F10 & F11 (Canonical Assets, Reference Scripts, Docs, & Version Bump)**: `protocols_canonical.json` (107 sections) in assets, patched `scripts/clinical_pipeline.py`, `scripts/generate_visit_list.py`, `scripts/index_protocols.py`, `scripts/test_parity.py` (100% recall, 0% false escalation), docs, bumped to `versionCode = 7` / `versionName = "1.6.0-H5"`, and assembled `app-debug.apk` (17.3 MB). Committed in `cf24663`.
