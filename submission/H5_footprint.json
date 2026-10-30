@@ -1,10 +1,9 @@
 {
   "model_names": [
-    "sahaaya-deterministic-safety-pipeline",
-    "sahaaya-hybrid-bm25-retriever"
+    "sahaaya-hybrid-bm25-offline"
   ],
   "model_size_mb": 0.0,
-  "peak_ram_mb": 1.2,
-  "median_latency_ms_cpu": 0.45,
+  "peak_ram_mb": 45.2,
+  "median_latency_ms_cpu": 1.219,
   "offline": true
 }

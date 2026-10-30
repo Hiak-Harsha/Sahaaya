@@ -56,9 +56,9 @@ sealed class PipelineOutput {
         val actionText: String = "REFER NOW",
         val citation: String,
         val citedSectionIds: List<String> = listOf(rule.chunkId),
-        val authoritativeAnswer: String = "",
-        val recommendedFacility: String = "CHC / FRU (First Referral Unit)",
-        val evidenceStrength: String = "STRONG_PROTOCOL_EVIDENCE"
+        val authoritativeAnswer: String = "${rule.dangerSign}: ${rule.action} (${rule.sourceCitation}).",
+        val recommendedFacility: String = "CHC / FRU Hospital",
+        val evidenceStrength: String = "CRITICAL_DANGER_ESCALATION"
     ) : PipelineOutput()
 
     data class ScopeRefusal(
@@ -73,7 +73,7 @@ sealed class PipelineOutput {
         val score: Double,
         val citationText: String,
         val citedSectionIds: List<String> = listOf(chunk.id),
-        val authoritativeAnswer: String = "",
+        val authoritativeAnswer: String = chunk.text,
         val evidenceStrength: String = "STRONG_PROTOCOL_EVIDENCE",
         val recommendedFacility: String = "Sub-Centre / PHC"
     ) : PipelineOutput()
@@ -84,10 +84,16 @@ sealed class PipelineOutput {
     ) : PipelineOutput()
 }
 
+enum class PriorityGroup {
+    DANGER,   // Priority 1
+    OVERDUE,  // Priority 2
+    UPCOMING  // Priority 3
+}
+
 data class RegisterMember(
+    val memberId: String = "",
     val familyId: String = "",
-    val memberId: String,
-    val name: String,
+    val name: String = "",
     val memberType: String = "",
     val targetDate: String = "",
     val lastVisitDate: String = "",
@@ -111,14 +117,38 @@ data class RegisterMember(
     val reportedSymptoms: String = "",
     val riskFlags: String = "",
     val phone: String = "",
-    val assignedAshaId: String = ""
+    val assignedAshaId: String = "",
+    // Additional workflow/UI fields:
+    val ageMonths: Int = 0,
+    val gender: String = "F",
+    val deliveryType: String = "INSTITUTIONAL",
+    val immunizationHistory: String = "",
+    val highRiskFlag: String = "false",
+    val bpSystolic: Int = 120,
+    val bpDiastolic: Int = 80,
+    val bloodSugarFasting: Int = 90,
+    val muacCm: Double = 13.5,
+    val bilateralPittingOedema: String = "false",
+    val lat: Double = 17.3850,
+    val lng: Double = 78.4867,
+    // Official VIS fields:
+    val ancVisitDates: String = "",
+    val lastAncBp: String = "",
+    val lastHbGdl: String = "",
+    val tdBoosterEligible: String = "",
+    val tdDoses: String = "",
+    val placeOfDelivery: String = "",
+    val birthWeightKg: String = "",
+    val hbncVisitsDone: String = "",
+    val childVaccines: String = "",
+    val lastMuacCm: String = "",
+    val lastMuacDate: String = "",
+    val ncdCondition: String = "",
+    val lastBpCheckDate: String = "",
+    val lastBpReading: String = "",
+    val lastSugarCheckDate: String = "",
+    val lastRbsMgDl: String = ""
 )
-
-enum class PriorityGroup {
-    DANGER,   // Priority 1
-    OVERDUE,  // Priority 2
-    UPCOMING  // Priority 3
-}
 
 data class PrioritizedVisit(
     val member: RegisterMember,
@@ -128,5 +158,15 @@ data class PrioritizedVisit(
     val reason: String,
     val daysDiff: Long,
     val actionProtocolId: String = "",
-    val recommendedFacility: String = "Sub-Centre / PHC"
+    val recommendedFacility: String = "Sub-Centre / PHC",
+    val dueItem: String = ""
+)
+
+data class SubmissionRow(
+    val question_id: String,
+    val answer_text: String,
+    val cited_section_ids: List<String>,
+    val escalate: Boolean,
+    val refused: Boolean,
+    val latency_ms: Double
 )

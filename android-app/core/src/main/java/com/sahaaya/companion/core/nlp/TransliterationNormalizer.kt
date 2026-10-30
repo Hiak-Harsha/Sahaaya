@@ -214,13 +214,17 @@ object TransliterationNormalizer {
      * Short tokens (<4): must match exactly to prevent dangerous clinical misinterpretation.
      */
     private val protectedWords = setOf(
+        "list", "line", "form", "card", "test", "camp", "ward", "room", "door", "paas",
+        "dikh", "dikha", "dikhana", "milta", "milti", "milte", "mile", "khel", "khelta", "khelte",
+        "raat", "subah", "shaam", "dopahar", "din", "ghar", "naam", "saal", "mahina", "mahine",
+        "aana", "jaana", "aaya", "aayi", "aaye", "gaya", "gayi", "gaye", "bhejna", "bheju", "bheja",
+        "poochna", "poocha", "batana", "batayein", "dekha", "dekh", "hua", "hui", "hue",
         "baad", "pehle", "saath", "liye", "bina", "kabhi", "hamesha",
         "kitna", "kitni", "kitne", "kaise", "kaisa", "kaisi", "kyun", "kahan", "kab",
         "karna", "karein", "kare", "karta", "karti", "karte", "dena", "dijiye",
         "sakte", "sakti", "sakta", "hona", "honi", "chahiye", "hota", "hoti", "hote",
-        "hotaa", "maana", "jaata", "jaati", "gaya", "gayi", "gaye", "aaya", "aayi",
-        "raha", "rahi", "rahe", "wala", "wali", "wale", "waqt", "samay", "time",
-        "haath", "pet", "dard", "sir", "sar", "aankh", "kaan", "gala"
+        "hotaa", "maana", "jaata", "jaati", "raha", "rahi", "rahe", "wala", "wali", "wale",
+        "waqt", "samay", "time", "haath", "pet", "dard", "sir", "sar", "aankh", "kaan", "gala"
     )
 
     fun correctTypo(token: String): String {
@@ -248,7 +252,12 @@ object TransliterationNormalizer {
         )
         aliases[low]?.let { return it }
 
-        val maxAllowed = if (low.length <= 5) 2 else 2
+        val maxAllowed = when {
+            low.length <= 4 -> 0
+            low.length <= 6 -> 1
+            else -> 2
+        }
+        if (maxAllowed == 0) return low
         var bestCandidate: String? = null
         var bestDist = Int.MAX_VALUE
 

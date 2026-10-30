@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.VolumeUp
+import com.sahaaya.companion.ui.audio.SahaayaTtsManager
 import com.sahaaya.companion.features.advisory.PatientAdvisoryEngine
 import com.sahaaya.companion.features.emergency.EmergencySosEngine
 import com.sahaaya.companion.features.facilities.FacilityDirectory
@@ -62,16 +64,38 @@ fun AskScreen(
     var currentOutput by remember { mutableStateOf<PipelineOutput?>(null) }
     var showReferralSlip by remember { mutableStateOf(false) }
 
+    val ttsManager = remember { SahaayaTtsManager(context) }
+    DisposableEffect(Unit) {
+        onDispose {
+            ttsManager.shutdown()
+        }
+    }
+
     // Offline Voice Recognizer Launcher
     val speechRecognizerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText: String? =
-                result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-            if (!spokenText.isNullOrBlank()) {
-                queryText = spokenText
-                currentOutput = pipeline.process(spokenText)
+            val candidates = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!candidates.isNullOrEmpty()) {
+                var dangerCand: String? = null
+                var dangerOut: PipelineOutput? = null
+                for (cand in candidates) {
+                    val out = pipeline.process(cand)
+                    if (out is PipelineOutput.DangerEscalation) {
+                        dangerCand = cand
+                        dangerOut = out
+                        break
+                    }
+                }
+                if (dangerOut != null && dangerCand != null) {
+                    queryText = dangerCand
+                    currentOutput = dangerOut
+                } else {
+                    val spoken = candidates.first()
+                    queryText = spoken
+                    currentOutput = pipeline.process(spoken)
+                }
             }
         }
     }
@@ -87,6 +111,8 @@ fun AskScreen(
             }
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, langTag)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, langTag)
+            putExtra("android.speech.extra.PREFER_OFFLINE", true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
         }
         try {
             speechRecognizerLauncher.launch(intent)
@@ -401,6 +427,19 @@ fun AskScreen(
                                         fontSize = 15.sp
                                     )
                                 }
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = {
+                                        val speech = "${output.rule.dangerSign}. ${output.rule.action}. Destination: ${output.recommendedFacility}"
+                                        ttsManager.speak(speech, language)
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.VolumeUp,
+                                        contentDescription = "Read aloud",
+                                        tint = if (isDarkTheme) DangerRedDark else DangerRed
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -557,6 +596,18 @@ fun AskScreen(
                                         color = if (isDarkTheme) WarningAmberDark else WarningAmber
                                     )
                                 )
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = {
+                                        ttsManager.speak(output.message, language)
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.VolumeUp,
+                                        contentDescription = "Read aloud",
+                                        tint = if (isDarkTheme) WarningAmberDark else WarningAmber
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
@@ -604,6 +655,23 @@ fun AskScreen(
                                         color = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
                                     )
                                 )
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = {
+                                        val textToSpeak = if (!output.authoritativeAnswer.isNullOrBlank()) {
+                                            "${output.chunk.title}. ${output.authoritativeAnswer}"
+                                        } else {
+                                            "${output.chunk.title}. ${output.chunk.text}"
+                                        }
+                                        ttsManager.speak(textToSpeak, language)
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.VolumeUp,
+                                        contentDescription = "Read aloud",
+                                        tint = if (isDarkTheme) PrimaryTealDarkTheme else PrimaryTeal
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(

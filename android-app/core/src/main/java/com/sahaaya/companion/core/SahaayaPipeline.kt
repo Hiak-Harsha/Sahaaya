@@ -70,4 +70,50 @@ class SahaayaPipeline(
             recommendedFacility = if (chunk.id.startsWith("ESC")) "CHC / FRU" else "Sub-Centre / PHC"
         )
     }
+
+    /**
+     * Single official submission entry point required by WS0.
+     * Guaranteed to match the exact evaluation format of evaluate.py.
+     */
+    fun answerForSubmission(query: String, questionId: String = ""): SubmissionRow {
+        val t0 = System.nanoTime()
+        val out = process(query)
+        val latencyMs = (System.nanoTime() - t0) / 1_000_000.0
+        val roundedLat = Math.round(latencyMs * 1000.0) / 1000.0
+
+        return when (out) {
+            is PipelineOutput.DangerEscalation -> SubmissionRow(
+                question_id = questionId,
+                answer_text = out.authoritativeAnswer.take(400),
+                cited_section_ids = out.citedSectionIds.take(2),
+                escalate = true,
+                refused = false,
+                latency_ms = roundedLat
+            )
+            is PipelineOutput.ScopeRefusal -> SubmissionRow(
+                question_id = questionId,
+                answer_text = out.message.take(400),
+                cited_section_ids = out.citedSectionIds.take(2),
+                escalate = false,
+                refused = true,
+                latency_ms = roundedLat
+            )
+            is PipelineOutput.ProtocolAnswer -> SubmissionRow(
+                question_id = questionId,
+                answer_text = out.authoritativeAnswer.take(400),
+                cited_section_ids = out.citedSectionIds.take(2),
+                escalate = false,
+                refused = false,
+                latency_ms = roundedLat
+            )
+            is PipelineOutput.OutOfCorpus -> SubmissionRow(
+                question_id = questionId,
+                answer_text = out.message.take(400),
+                cited_section_ids = emptyList(),
+                escalate = false,
+                refused = true,
+                latency_ms = roundedLat
+            )
+        }
+    }
 }
