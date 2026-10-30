@@ -2,6 +2,7 @@ package com.sahaaya.companion.core
 
 import com.sahaaya.companion.core.nlp.ProcessedQuery
 import com.sahaaya.companion.core.nlp.QueryUnderstandingEngine
+import java.util.regex.Pattern
 
 class DangerRuleEngine(private val rules: List<DangerRule>) {
 
@@ -13,6 +14,16 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
     )
 
     private val phraseEntries: List<PhraseEntry>
+
+    private val devanagariTransliteration = mapOf(
+        "बुखार" to "bukhar", "दस्त" to "dast", "उल्टी" to "ulti", "खून" to "khoon",
+        "झटके" to "jhatke", "बेहोश" to "behosh", "साँस" to "saans", "पसली" to "pasli",
+        "ठंडा" to "thanda", "पीला" to "peela", "दूध" to "doodh", "सूजन" to "sujan",
+        "टीका" to "tika", "गर्भवती" to "garbhvati", "प्रसव" to "prasav", "बच्चा" to "bachcha",
+        "दर्द" to "dard", "दवाई" to "dawai", "गोली" to "goli", "पहला" to "pehla", "माँ" to "maa",
+        "दौरे" to "daura", "दौरा" to "daura", "मिर्गी" to "mirgi", "चेहरा" to "chehra",
+        "धुंधला" to "dhundhla", "हथेली" to "hatheli", "छाती" to "chhati", "सीना" to "seena"
+    )
 
     init {
         val entries = mutableListOf<PhraseEntry>()
@@ -33,9 +44,13 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
         )
     }
 
-    private fun normalize(text: String): String {
-        return text.lowercase()
-            .replace(Regex("[^a-zA-Z0-9\\u0900-\\u097F\\u0C00-\\u0C7F\\s]"), " ")
+    fun normalize(text: String): String {
+        var t = text.lowercase()
+        for ((dev, rom) in devanagariTransliteration) {
+            t = t.replace(dev, " $rom ")
+        }
+        return t
+            .replace(Regex("[^a-zA-Z0-9\\u0900-\\u097F\\u0C00-\\u0C7F\\s\\.\\-]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
@@ -46,15 +61,19 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
 
     fun evaluate(query: String, processedQuery: ProcessedQuery): DangerMatchResult {
         val rawLow = query.lowercase().trim()
+        val transliterated = normalize(query)
         val normLow = processedQuery.normalizedQuery.lowercase().trim()
-        val low = "$rawLow $normLow"
+        val low = "$rawLow $transliterated $normLow"
         val normQuery = normalize("$query ${processedQuery.normalizedQuery}")
         if (normQuery.isBlank()) {
             return DangerMatchResult(matched = false)
         }
 
-        // Method / Informational inquiry filters (do not escalate educational / method questions)
+        // Method / Informational inquiry filters (routine screening/measurement is NOT an emergency)
         if (processedQuery.isEducationalQuery ||
+            low.contains("kaise check") ||
+            low.contains("kaise naap") ||
+            low.contains("screening chal rahi") ||
             low.contains("kaise check karte") ||
             low.contains("kab maana jaata") ||
             low.contains("kitni ho to tez") ||
@@ -63,177 +82,232 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
             return DangerMatchResult(matched = false)
         }
 
+        // Check if any extracted clinical concept is explicitly negated
+        val negatedConceptIds = processedQuery.extractedConcepts.filter { it.isNegated }.map { it.id }.toSet()
+
+        // -------------------------------------------------------------
+        // NUMERIC PARSING LAYER (Infant weight, Fever duration, BP)
+        // -------------------------------------------------------------
+
+        // 1. Birth weight / Infant weight numeric parsing (< 1.8 kg is ESC-4.4)
+        val kgMatcher = Pattern.compile("(\\d+(\\.\\d+)?)\\s*kg").matcher(low)
+        val isInfantWeightContext = low.contains("bachcha") || low.contains("baby") || low.contains("paida") ||
+                low.contains("wajan") || low.contains("weight") || low.contains("janm") ||
+                low.contains("shishu") || low.contains("newborn") || low.contains("infant") || low.contains("biddha")
+        if (kgMatcher.find()) {
+            val weightVal = kgMatcher.group(1)?.toDoubleOrNull() ?: 2.5
+            if (weightVal < 1.8 && isInfantWeightContext) {
+                return createResult("ESC-4.4", "Very low birth weight ($weightVal kg < 1.8 kg)", "birth weight < 1.8 kg", "CRITICAL: REFER IMMEDIATELY TO SNCU (ESC-4.4)")
+            }
+            if (weightVal >= 1.8 && !low.contains("1.7 kg") && !low.contains("1.6 kg") && !low.contains("1.5 kg")) {
+                // Not low birth weight emergency threshold
+            }
+        }
+
+        // 2. Fever duration numeric parsing (>= 7 days is ESC-5.4)
+        val feverMatcher = Pattern.compile("(\\d+)\\s*(?:din|days?|rojulu)").matcher(low)
+        val isFeverContext = low.contains("bukhar") || low.contains("fever") || low.contains("taap") || low.contains("jwaram")
+        if (feverMatcher.find() && isFeverContext) {
+            val days = feverMatcher.group(1)?.toIntOrNull() ?: 1
+            if (days >= 7) {
+                return createResult("ESC-5.4", "Prolonged fever ($days days >= 7 days)", "fever >= 7 days", "REFER URGENTLY FOR HOSPITAL ASSESSMENT (ESC-5.4)")
+            }
+        }
+
+        // 3. Blood Pressure numeric parsing (Severe crisis >= 180/110; Pregnancy >= 140/90)
+        val bpMatcher = Pattern.compile("(\\d{2,3})\\s*/\\s*(\\d{2,3})").matcher(low)
+        if (bpMatcher.find()) {
+            val sys = bpMatcher.group(1)?.toIntOrNull() ?: 120
+            val dia = bpMatcher.group(2)?.toIntOrNull() ?: 80
+            val isPregnancyContext = low.contains("pregnant") || low.contains("garbh") || low.contains("garbhavathi") || low.contains("delivery") || low.contains("prasav")
+            if (sys >= 180 || dia >= 110) {
+                return createResult("ESC-6.4", "Hypertensive crisis (BP $sys/$dia >= 180/110)", "BP $sys/$dia", "CRITICAL: REFER IMMEDIATELY TO CHC/FRU (ESC-6.4)")
+            }
+            if (isPregnancyContext && (sys >= 140 || dia >= 90)) {
+                return createResult("ESC-2.3", "Severe hypertension in pregnancy (BP $sys/$dia >= 140/90)", "BP $sys/$dia in pregnancy", "URGENT PRE-ECLAMPSIA REFERRAL TO FRU (ESC-2.3)")
+            }
+        }
+
         // Boundary cases (non-emergency thresholds)
         if (low.contains("1.9 kg")) return DangerMatchResult(matched = false)
         if (low.contains("kabhi kabhi ulti") && low.contains("doodh pee")) return DangerMatchResult(matched = false)
         if (low.contains("hb 8.6")) return DangerMatchResult(matched = false)
 
-        // Check if any extracted clinical concept is explicitly negated
-        val negatedConceptIds = processedQuery.extractedConcepts.filter { it.isNegated }.map { it.id }.toSet()
-
         // Check active, non-negated clinical emergency concepts from QueryUnderstandingEngine
         for (concept in processedQuery.extractedConcepts) {
             if (!concept.isNegated && concept.primaryProtocolSection.startsWith("ESC")) {
-                val rule = findRuleForChunk(concept.primaryProtocolSection)
-                    ?: createSyntheticRule(
-                        concept.primaryProtocolSection,
-                        concept.canonicalName,
-                        "${concept.canonicalName}: refer immediately, call 108 (${concept.primaryProtocolSection})."
-                    )
-                return DangerMatchResult(
-                    matched = true,
-                    rule = rule,
-                    matchedPhrase = concept.matchedPhrase,
-                    citedSectionId = concept.primaryProtocolSection,
-                    authoritativeAnswer = "${concept.canonicalName}: refer immediately, call 108 (${concept.primaryProtocolSection})."
+                return createResult(
+                    concept.primaryProtocolSection,
+                    concept.canonicalName,
+                    concept.matchedPhrase,
+                    "${concept.canonicalName}: refer immediately, call 108 (${concept.primaryProtocolSection})."
                 )
             }
         }
 
-        // 1. Unconscious (ESC-6.3)
-        if (low.contains("behosh") || low.contains("unconscious")) {
-            val rule = findRuleForChunk("ESC-6.3") ?: createSyntheticRule("ESC-6.3", "Unconsciousness in Diabetes", "Unconscious diabetes patient: refer immediately, call 108; give nothing by mouth (ESC-6.3, ESC-1.3).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "unconscious / behosh",
-                citedSectionId = "ESC-6.3",
-                authoritativeAnswer = "Unconscious diabetes patient: refer immediately, call 108; give nothing by mouth (ESC-6.3, ESC-1.3)."
-            )
+        // -------------------------------------------------------------
+        // MATERNAL & OBSTETRIC EMERGENCIES (ESC-2 & ESC-3)
+        // -------------------------------------------------------------
+
+        // Bleeding in pregnancy / delivery (ESC-2.1)
+        if ((low.contains("khoon") || low.contains("bleed") || low.contains("rakt") || low.contains("raktham")) &&
+            (low.contains("pregnant") || low.contains("garbh") || low.contains("delivery") ||
+             low.contains("prasav") || low.contains("mahin") || low.contains("kadupu"))
+        ) {
+            return createResult("ESC-2.1", "Vaginal bleeding during pregnancy/delivery", "bleeding in pregnancy", "REFER NOW to FRU/Hospital (ESC-2.1)")
         }
 
-        // 2. Child not able to drink/breastfeed (ESC-5.1)
-        if (low.contains("doodh nahi pee") || low.contains("unable to drink") || low.contains("cannot drink") || low.contains("unable to breastfeed")) {
-            val rule = findRuleForChunk("ESC-5.1") ?: createSyntheticRule("ESC-5.1", "Inability to drink or breastfeed", "Child not able to drink or breastfeed is a critical danger sign: refer immediately, call 108 (ESC-5.1).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "doodh nahi pee",
-                citedSectionId = "ESC-5.1",
-                authoritativeAnswer = "Child not able to drink or breastfeed is a critical danger sign: refer immediately, call 108 (ESC-5.1)."
-            )
-        }
-
-        // 3. Convulsions / fits (ESC-5.1 or ESC-2.2)
+        // Fits / Convulsions in pregnancy (ESC-2.2)
         val hasConvulsionNegation = low.contains("jhatke nahi") || low.contains("no fits") || low.contains("no convulsion") || low.contains("fits nahi") || low.contains("fits levu") || negatedConceptIds.contains("CONVULSIONS")
-        if (!hasConvulsionNegation && (low.contains("jhatke") || low.contains("convuls") || low.contains("fits") || low.contains("mirgi"))) {
-            val rule = findRuleForChunk("ESC-5.1") ?: createSyntheticRule("ESC-5.1", "Convulsions / Fits", "Convulsions during fever: critical danger sign, refer immediately, call 108 (ESC-5.1).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "jhatke / fits",
-                citedSectionId = "ESC-5.1",
-                authoritativeAnswer = "Convulsions during fever: critical danger sign, refer immediately, call 108 (ESC-5.1)."
-            )
-        }
-
-        // 4. Pre-eclampsia: facial swelling + headache in pregnancy (ESC-2.3)
-        if ((low.contains("suja") || low.contains("sujan") || low.contains("swelling")) && (low.contains("chehra") || low.contains("face"))) {
-            val rule = findRuleForChunk("ESC-2.3") ?: createSyntheticRule("ESC-2.3", "Pre-eclampsia Facial Swelling & Headache", "Swelling of the face with headache in pregnancy are pre-eclampsia danger signs: refer immediately, call 108 (ESC-2.3).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "swelling face / chehra suja",
-                citedSectionId = "ESC-2.3",
-                authoritativeAnswer = "Swelling of the face with headache in pregnancy are pre-eclampsia danger signs: refer immediately, call 108 (ESC-2.3)."
-            )
-        }
-
-        // 5. Prolonged fever >= 7 days (ESC-5.4)
-        if ((low.contains("bukhar") || low.contains("fever") || low.contains("taap")) &&
-            (low.contains("9 din") || low.contains("7 din") || low.contains("hafte bhar") || low.contains("more than 7 days"))
+        if (!hasConvulsionNegation &&
+            (low.contains("pregnant") || low.contains("garbh") || low.contains("delivery")) &&
+            (low.contains("jhatke") || low.contains("fits") || low.contains("daura") || low.contains("mirgi") || low.contains("behosh"))
         ) {
-            val rule = findRuleForChunk("ESC-5.4") ?: createSyntheticRule("ESC-5.4", "Prolonged Fever >= 7 Days", "Fever every day for more than 7 days: refer immediately for hospital assessment (ESC-5.4).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "bukhar 9 din / prolonged fever",
-                citedSectionId = "ESC-5.4",
-                authoritativeAnswer = "Fever every day for more than 7 days: refer immediately for hospital assessment (ESC-5.4)."
-            )
+            return createResult("ESC-2.2", "Eclampsia / convulsions in pregnancy", "fits in pregnancy", "CRITICAL: REFER NOW to FRU (ESC-2.2)")
         }
 
-        // 6. Birth weight < 1.8 kg (ESC-4.4)
-        if (low.contains("1.6 kg") || low.contains("1.5 kg") || low.contains("1.7 kg") || low.contains("1.4 kg") || (low.contains("weight") && low.contains("< 1.8"))) {
-            val rule = findRuleForChunk("ESC-4.4") ?: createSyntheticRule("ESC-4.4", "Very Low Birth Weight < 1.8 kg", "Birth weight less than 1.8 kg: critical danger sign, refer immediately to the SNCU (ESC-4.4).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "birth weight < 1.8 kg",
-                citedSectionId = "ESC-4.4",
-                authoritativeAnswer = "Birth weight less than 1.8 kg: critical danger sign, refer immediately to the SNCU (ESC-4.4)."
-            )
-        }
-
-        // 7. Excessive vomiting in pregnancy (ESC-2.6)
-        if ((low.contains("ulti") || low.contains("vomit")) && (low.contains("paani") || low.contains("din bhar") || low.contains("everything"))) {
-            val rule = findRuleForChunk("ESC-2.6") ?: createSyntheticRule("ESC-2.6", "Excessive Vomiting in Pregnancy", "Excessive vomiting, unable to take anything by mouth: refer immediately to hospital (ESC-2.6).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "excessive vomiting / ulti",
-                citedSectionId = "ESC-2.6",
-                authoritativeAnswer = "Excessive vomiting, unable to take anything by mouth: refer immediately to hospital (ESC-2.6)."
-            )
-        }
-
-        // 8. Severe pallor with breathlessness in pregnancy (ESC-2.5)
-        if ((low.contains("peeli") || low.contains("pallor")) && (low.contains("saans") || low.contains("breathless"))) {
-            val rule = findRuleForChunk("ESC-2.5") ?: createSyntheticRule("ESC-2.5", "Severe Pallor with Breathlessness", "Severe pallor with breathlessness: severe anaemia danger sign, refer immediately to FRU (ESC-2.5).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "peeli saans / severe pallor",
-                citedSectionId = "ESC-2.5",
-                authoritativeAnswer = "Severe pallor with breathlessness: severe anaemia danger sign, refer immediately to FRU (ESC-2.5)."
-            )
-        }
-
-        // 9. Severe postpartum haemorrhage (ESC-3.1)
-        if ((low.contains("pad") && (low.contains("5 min") || low.contains("minute") || low.contains("bheeg") || low.contains("soaked") || low.contains("khoon") || low.contains("bleeding"))) ||
-            ((low.contains("khoon") || low.contains("bleeding")) && (low.contains("delivery") || low.contains("prasav")))
+        // Pre-eclampsia: severe headache, facial swelling, blurred vision (ESC-2.3)
+        if ((low.contains("pregnant") || low.contains("garbh") || low.contains("mahin")) &&
+            ((low.contains("chehra") && (low.contains("suja") || low.contains("sujan"))) ||
+             (low.contains("face") && low.contains("swell")) ||
+             ((low.contains("dhundhla") || low.contains("blur")) && (low.contains("sir dard") || low.contains("headache"))))
         ) {
-            val rule = findRuleForChunk("ESC-3.1") ?: createSyntheticRule("ESC-3.1", "Severe Postpartum Haemorrhage", "A pad soaked in less than 5 minutes: severe postpartum haemorrhage, refer immediately, call 108 (ESC-3.1).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "pad soaked / khoon",
-                citedSectionId = "ESC-3.1",
-                authoritativeAnswer = "A pad soaked in less than 5 minutes: severe postpartum haemorrhage, refer immediately, call 108 (ESC-3.1)."
-            )
+            return createResult("ESC-2.3", "Pre-eclampsia (severe headache, facial swelling, blurred vision)", "pre-eclampsia symptoms", "REFER URGENTLY to CHC/FRU (ESC-2.3)")
         }
 
-        // 10. Newborn cold to touch / hypothermia (ESC-4.3)
-        if (low.contains("thanda lag raha") || low.contains("cold to touch") || low.contains("feels cold") || low.contains("hypothermia")) {
-            val rule = findRuleForChunk("ESC-4.3") ?: createSyntheticRule("ESC-4.3", "Newborn Hypothermia", "A baby cold to touch is a hypothermia danger sign: keep skin-to-skin (KMC) and refer immediately, call 108 (ESC-4.3).")
-            return DangerMatchResult(
-                matched = true,
-                rule = rule,
-                matchedPhrase = "thanda / cold to touch",
-                citedSectionId = "ESC-4.3",
-                authoritativeAnswer = "A baby cold to touch is a hypothermia danger sign: keep skin-to-skin (KMC) and refer immediately, call 108 (ESC-4.3)."
-            )
+        // Severe anaemia with breathlessness / extreme pallor (ESC-2.5)
+        if ((low.contains("peeli") || low.contains("peela") || low.contains("pallor")) &&
+            (low.contains("saans phool") || low.contains("saans lene") || low.contains("breathless") || low.contains("chalne pe saans") || low.contains("saans"))
+        ) {
+            return createResult("ESC-2.5", "Severe anaemia with breathlessness", "severe pallor with respiratory distress", "URGENT REFERRAL to FRU (ESC-2.5)")
+        }
+
+        // Excessive vomiting in pregnancy (ESC-2.6)
+        if ((low.contains("ulti") || low.contains("vomit")) &&
+            (low.contains("garbh") || low.contains("pregnant")) &&
+            (low.contains("paani") || low.contains("din bhar") || low.contains("everything") || low.contains("ruk nahi"))
+        ) {
+            return createResult("ESC-2.6", "Excessive vomiting in pregnancy", "excessive vomiting", "REFER IMMEDIATELY to hospital (ESC-2.6)")
+        }
+
+        // Decreased or absent foetal movements (ESC-2.7)
+        if ((low.contains("bachcha") || low.contains("baby") || low.contains("pet me") || low.contains("foetal") || low.contains("fetal")) &&
+            (low.contains("hil nahi") || (low.contains("movement") && (low.contains("kam") || low.contains("band") || low.contains("nahi") || low.contains("stopped"))))
+        ) {
+            return createResult("ESC-2.7", "Reduced or absent foetal movement", "foetal distress", "REFER TO CHC/FRU (ESC-2.7)")
+        }
+
+        // Leaking water bag / foul lochia / PROM (ESC-2.8)
+        if (low.contains("thaili") || low.contains("water bag") || low.contains("paani choot") || low.contains("leaking") ||
+            (low.contains("lochia") && (low.contains("badbu") || low.contains("foul")))
+        ) {
+            return createResult("ESC-2.8", "Leaking amniotic fluid / premature rupture of membranes", "leaking water bag", "REFER IMMEDIATELY to FRU (ESC-2.8)")
+        }
+
+        // Postpartum haemorrhage / heavy pad soaking (ESC-3.1)
+        if (low.contains("pad") && (low.contains("bhar") || low.contains("soak") || low.contains("bheeg") || low.contains("minute") || low.contains("5 min"))) {
+            return createResult("ESC-3.1", "Severe postpartum haemorrhage (PPH)", "heavy pad soaking", "REFER IMMEDIATELY (Call 108) (ESC-3.1)")
+        }
+
+        // -------------------------------------------------------------
+        // NEWBORN & INFANT EMERGENCIES (ESC-4)
+        // -------------------------------------------------------------
+
+        // Fast breathing (>= 60 breaths/min) or severe chest indrawing in newborn (ESC-4.2)
+        if ((low.contains("bachcha") || low.contains("baby") || low.contains("shishu") || low.contains("newborn")) &&
+            (low.contains("60 se upar") || low.contains("60 breaths") || low.contains("fast breath") ||
+             low.contains("pasli andar") || low.contains("chest indrawing") || low.contains("seena dab"))
+        ) {
+            return createResult("ESC-4.2", "Severe newborn respiratory distress / chest indrawing", "fast breathing / chest indrawing", "CRITICAL: REFER TO SNCU/NBSU (ESC-4.2)")
+        }
+
+        // Newborn hypothermia / cold to touch (ESC-4.3)
+        if (low.contains("thanda lag raha") || low.contains("cold to touch") || low.contains("feels cold") || low.contains("hypothermia") ||
+            ((low.contains("bachcha") || low.contains("baby") || low.contains("newborn")) && (low.contains("thanda") || low.contains("cold")))
+        ) {
+            return createResult("ESC-4.3", "Newborn hypothermia", "baby cold to touch", "START KMC & REFER IMMEDIATELY TO SNCU (ESC-4.3)")
+        }
+
+        // -------------------------------------------------------------
+        // CHILD EMERGENCIES (ESC-5)
+        // -------------------------------------------------------------
+
+        // Unable to drink / breastfeed or unconscious (ESC-5.1)
+        if (low.contains("doodh nahi pee") || low.contains("unable to drink") || low.contains("cannot drink") || low.contains("unable to breastfeed") ||
+            low.contains("behosh") || low.contains("unconscious") || low.contains("lethargic")
+        ) {
+            return createResult("ESC-5.1", "Inability to drink or unconscious child", "child unable to feed / lethargic", "CRITICAL DANGER SIGN: REFER IMMEDIATELY (Call 108) (ESC-5.1)")
+        }
+
+        // Convulsions in child (ESC-5.1)
+        if (!hasConvulsionNegation && (low.contains("jhatke") || low.contains("convuls") || low.contains("fits") || low.contains("mirgi") || low.contains("daura"))) {
+            return createResult("ESC-5.1", "Convulsions / fits", "convulsions reported", "CRITICAL DANGER SIGN: REFER IMMEDIATELY (Call 108) (ESC-5.1)")
+        }
+
+        // Dysentery / blood in diarrhoea or persistent diarrhoea >= 14 days (ESC-5.3)
+        if ((low.contains("dast") || low.contains("diarrhoea") || low.contains("loose motion")) &&
+            (low.contains("khoon") || low.contains("blood") || low.contains("14 din") || low.contains("14 days") || low.contains("two weeks") || low.contains("2 hafte"))
+        ) {
+            return createResult("ESC-5.3", "Dysentery / persistent diarrhoea >= 14 days", "blood in diarrhoea / prolonged diarrhea", "REFER TO PHC/CHC (ESC-5.3)")
+        }
+
+        // Bilateral pitting oedema (ESC-5.5)
+        if ((low.contains("dono pair") || low.contains("both feet")) &&
+            (low.contains("sujan") || low.contains("oedema") || low.contains("swelling")) &&
+            (low.contains("bachch") || low.contains("child"))
+        ) {
+            return createResult("ESC-5.5", "Bilateral pitting oedema (Kwashiorkor / SAM)", "bilateral pedal oedema", "REFER TO NRC/MTC (ESC-5.5)")
+        }
+
+        // Severe palmar pallor (ESC-5.7)
+        if (low.contains("palmar pallor") || (low.contains("hatheli") && (low.contains("safed") || low.contains("peeli")))) {
+            return createResult("ESC-5.7", "Severe palmar pallor", "palmar pallor", "REFER TO FRU/CHC (ESC-5.7)")
+        }
+
+        // -------------------------------------------------------------
+        // ADULT & ACCIDENT EMERGENCIES (ESC-6 & ESC-1.4)
+        // -------------------------------------------------------------
+
+        // Heart attack / Myocardial infarction (ESC-6.1)
+        if ((low.contains("seene me dard") || low.contains("chest pain") || low.contains("chhati me dard")) &&
+            (low.contains("paseena") || low.contains("baazu") || low.contains("arm") || low.contains("sweat") || low.contains("tight") || low.contains("ghabrahat"))
+        ) {
+            return createResult("ESC-6.1", "Suspected myocardial infarction / heart attack", "chest pain with sweating/radiation", "CRITICAL: CALL 108 REFERRAL NOW (ESC-6.1)")
+        }
+
+        // Stroke / BE-FAST signs (ESC-6.2)
+        if ((low.contains("ek taraf") || low.contains("one side") || low.contains("munh tedha") || low.contains("facial droop") || low.contains("lakwa")) &&
+            (low.contains("kamzor") || low.contains("weak") || low.contains("paralysis") || low.contains("bol nahi") || low.contains("slurred"))
+        ) {
+            return createResult("ESC-6.2", "Suspected stroke (BE-FAST signs)", "facial droop / one-sided weakness", "CRITICAL: REFER NOW TO CT-CAPABLE FRU (ESC-6.2)")
+        }
+
+        // Snakebite / Poisoning / Severe burns (ESC-1.4)
+        if (low.contains("saanp") || low.contains("snake") || low.contains("paamu")) {
+            return createResult("ESC-1.4", "Snakebite emergency", "snakebite", "KEEP CALM & TRANSPORT IMMEDIATELY TO FRU (ASV) (ESC-1.4)")
+        }
+        if (low.contains("zahar") || low.contains("poison") || low.contains("kerosene") || low.contains("vishamu")) {
+            return createResult("ESC-1.4", "Poisoning / toxic ingestion", "poisoning", "DO NOT INDUCE VOMITING - TRANSPORT TO HOSPITAL (ESC-1.4)")
+        }
+        if (low.contains("jal gaya") || low.contains("severe burn") || low.contains("burns")) {
+            return createResult("ESC-1.4", "Severe burn emergency", "burn injury", "COVER WITH CLEAN SHEET & REFER TO FRU (ESC-1.4)")
         }
 
         // General phrase matching against all ingested danger rules
         val queryTokens = normQuery.split(" ").filter { it.isNotBlank() }.toSet()
         for (entry in phraseEntries) {
-            if (normQuery.contains(entry.normalizedPhrase)) {
-                return DangerMatchResult(
-                    matched = true,
-                    rule = entry.rule,
-                    matchedPhrase = entry.originalPhrase,
-                    citedSectionId = entry.rule.chunkId,
-                    authoritativeAnswer = "${entry.rule.dangerSign}: ${entry.rule.action} (${entry.rule.sourceCitation})."
-                )
+            val allPresent = entry.tokens.all { token ->
+                queryTokens.contains(token) || low.contains(token)
             }
-            if (entry.tokens.size >= 2 && entry.tokens.all { queryTokens.contains(it) }) {
+            if (allPresent && entry.tokens.isNotEmpty()) {
+                val actionText = if (entry.rule.action.isNotBlank()) entry.rule.action else "REFER NOW"
+                val answer = "${entry.rule.dangerSign}: ${actionText.lowercase()}, call 108 (${entry.rule.chunkId})."
                 return DangerMatchResult(
                     matched = true,
                     rule = entry.rule,
                     matchedPhrase = entry.originalPhrase,
                     citedSectionId = entry.rule.chunkId,
-                    authoritativeAnswer = "${entry.rule.dangerSign}: ${entry.rule.action} (${entry.rule.sourceCitation})."
+                    authoritativeAnswer = answer
                 )
             }
         }
@@ -242,19 +316,28 @@ class DangerRuleEngine(private val rules: List<DangerRule>) {
     }
 
     private fun findRuleForChunk(chunkId: String): DangerRule? {
-        return rules.firstOrNull { it.chunkId == chunkId }
+        return rules.find { it.chunkId.equals(chunkId, ignoreCase = true) }
     }
 
-    private fun createSyntheticRule(chunkId: String, name: String, answer: String): DangerRule {
-        return DangerRule(
-            id = "DANGER-$chunkId",
-            chunkId = chunkId,
-            category = "Critical Danger Sign",
-            dangerSign = name,
-            action = answer,
-            sourceCitation = chunkId,
-            note = "Protocol 07_ESC Critical Escalation Rule",
+    private fun createResult(leafId: String, dangerSign: String, matchedPhrase: String, actionText: String): DangerMatchResult {
+        val existingRule = findRuleForChunk(leafId)
+        val rule = existingRule ?: DangerRule(
+            id = "RULE-$leafId",
+            chunkId = leafId,
+            category = "EMERGENCY",
+            dangerSign = dangerSign,
+            action = actionText,
+            sourceCitation = "MoHFW Protocol $leafId",
+            note = "High-priority clinical emergency",
             phrasings = emptyMap()
+        )
+        val answer = "$dangerSign: $actionText ($leafId)."
+        return DangerMatchResult(
+            matched = true,
+            rule = rule,
+            matchedPhrase = matchedPhrase,
+            citedSectionId = leafId,
+            authoritativeAnswer = answer
         )
     }
 }
